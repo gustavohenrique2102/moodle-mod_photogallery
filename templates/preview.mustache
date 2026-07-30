@@ -1,0 +1,71 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    @template mod_photogallery/preview
+
+    Course page gallery mosaic.
+}}
+
+<div class="mod-photogallery-preview"
+     data-region="photogallery">
+
+    {{#hasintro}}
+        <div class="mod-photogallery-preview-intro mb-3">
+            {{{intro}}}
+        </div>
+    {{/hasintro}}
+
+    {{#hasimages}}
+        <div class="mod-photogallery-preview-grid">
+
+            {{#images}}
+                <a href="{{url}}"
+                   class="mod-photogallery-preview-item {{positionclass}}"
+                   target="_blank"
+                   rel="noopener"
+                   data-action="open-image"
+                   data-image-url="{{url}}"
+                   data-image-alt="{{alt}}"
+                   data-image-title="{{filename}}"
+                   data-image-caption="{{caption}}">
+
+                    <img src="{{thumbnailurl}}"
+                         class="mod-photogallery-preview-image"
+                         alt="{{alt}}"
+                         loading="lazy"
+                         decoding="async">
+
+                    {{#showremaining}}
+                        <span class="mod-photogallery-preview-remaining"
+                              aria-hidden="true">
+                            {{remaininglabel}}
+                        </span>
+                    {{/showremaining}}
+
+                    <span class="visually-hidden">
+                        {{filename}}
+                    </span>
+                </a>
+            {{/images}}
+
+        </div>
+
+        <div class="mod-photogallery-preview-footer">
+            <span class="mod-photogallery-preview-count">
+                {{totalphotoslabel}}
+            </span>
+
+            <a href="{{galleryurl}}"
+               class="btn btn-primary mod-photogallery-preview-button">
+                {{viewmorelabel}}
+            </a>
+        </div>
+    {{/hasimages}}
+
+    {{^hasimages}}
+        <div class="alert alert-info mb-0" role="status">
+            {{noimages}}
+        </div>
+    {{/hasimages}}
+
+</div>

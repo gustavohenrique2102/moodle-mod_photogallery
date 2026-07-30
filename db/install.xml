@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="mod/photogallery/db"
+       VERSION="2026072700"
+       COMMENT="XMLDB file for Moodle mod_photogallery"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
+
+    <TABLES>
+
+        <TABLE NAME="photogallery"
+               NEXT="photogallery_image"
+               COMMENT="Stores the configuration of each photo gallery activity">
+
+            <FIELDS>
+
+                <FIELD NAME="id"
+                       TYPE="int"
+                       LENGTH="10"
+                       NOTNULL="true"
+                       SEQUENCE="true"/>
+
+                <FIELD NAME="course"
+                       TYPE="int"
+                       LENGTH="10"
+                       NOTNULL="true"
+                       DEFAULT="0"
+                       SEQUENCE="false"/>
+
+                <FIELD NAME="name"
+                       TYPE="char"
+                       LENGTH="255"
+                       NOTNULL="true"
+                       DEFAULT=""
+                       SEQUENCE="false"/>
+
+                <FIELD NAME="intro"
+                       TYPE="text"
+                       NOTNULL="false"
+                       SEQUENCE="false"/>
+
+                <FIELD NAME="introformat"
+                       TYPE="int"
+                       LENGTH="4"
+                       NOTNULL="true"
+                       DEFAULT="0"
+                       SEQUENCE="false"/>
+
+                <FIELD NAME="previewcount"
+                       TYPE="int"
+                       LENGTH="4"
+                       NOTNULL="true"
+                       DEFAULT="6"
+                       SEQUENCE="false"/>
+
+                <FIELD NAME="timecreated"
+                       TYPE="int"
+                       LENGTH="10"
+                       NOTNULL="true"
+                       DEFAULT="0"
+                       SEQUENCE="false"/>
+
+                <FIELD NAME="timemodified"
+                       TYPE="int"
+                       LENGTH="10"
+                       NOTNULL="true"
+                       DEFAULT="0"
+                       SEQUENCE="false"/>
+
+            </FIELDS>
+
+            <KEYS>
+
+                <KEY NAME="primary"
+                     TYPE="primary"
+                     FIELDS="id"/>
+
+                <KEY NAME="course"
+                     TYPE="foreign"
+                     FIELDS="course"
+                     REFTABLE="course"
+                     REFFIELDS="id"/>
+
+            </KEYS>
+
+        </TABLE>
+        <TABLE NAME="photogallery_image"
+              COMMENT="Stores captions and alternative text for gallery images"
+              PREVIOUS="photogallery">
+
+              <FIELDS>
+                     <FIELD NAME="id"
+                            TYPE="int"
+                            LENGTH="10"
+                            NOTNULL="true"
+                            SEQUENCE="true"/>
+
+                     <FIELD NAME="photogalleryid"
+                            TYPE="int"
+                            LENGTH="10"
+                            NOTNULL="true"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="pathnamehash"
+                            TYPE="char"
+                            LENGTH="40"
+                            NOTNULL="true"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="caption"
+                            TYPE="text"
+                            NOTNULL="false"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="alttext"
+                            TYPE="text"
+                            NOTNULL="false"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="sortorder"
+                            TYPE="int"
+                            LENGTH="10"
+                            NOTNULL="true"
+                            DEFAULT="0"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="timecreated"
+                            TYPE="int"
+                            LENGTH="10"
+                            NOTNULL="true"
+                            DEFAULT="0"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="timemodified"
+                            TYPE="int"
+                            LENGTH="10"
+                            NOTNULL="true"
+                            DEFAULT="0"
+                            SEQUENCE="false"/>
+              </FIELDS>
+
+              <KEYS>
+                     <KEY NAME="primary"
+                     TYPE="primary"
+                     FIELDS="id"/>
+
+                     <KEY NAME="photogalleryid"
+                     TYPE="foreign"
+                     FIELDS="photogalleryid"
+                     REFTABLE="photogallery"
+                     REFFIELDS="id"/>
+              </KEYS>
+
+              <INDEXES>
+                     <INDEX NAME="gallerypath_uix"
+                            UNIQUE="true"
+                            FIELDS="photogalleryid, pathnamehash"/>
+
+                     <INDEX NAME="gallerysort_ix"
+                            UNIQUE="false"
+                            FIELDS="photogalleryid, sortorder"/>
+              </INDEXES>
+       </TABLE>
+
+    </TABLES>
+
+</XMLDB>

@@ -1,0 +1,36 @@
+# Editores.
+.vscode/
+.idea/
+*.code-workspace
+
+# Dependências locais.
+vendor/
+node_modules/
+
+# PHPUnit e cobertura.
+.phpunit.result.cache
+.phpunit.cache/
+coverage/
+clover.xml
+
+# Relatórios locais.
+photogallery-phpcs*.txt
+phpcs*.txt
+phpunit*.txt
+*.log
+
+# Pacotes e backups locais.
+*.zip
+*.mbz
+*.tar
+*.tar.gz
+
+# Arquivos temporários do sistema.
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos temporários.
+*.tmp
+*.temp
+*~

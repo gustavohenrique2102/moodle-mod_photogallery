@@ -1,0 +1,57 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    @template mod_photogallery/gallery
+
+    Full photo gallery.
+
+    Context variables required for this template:
+    * hasimages - Whether the gallery contains images.
+    * images - List of gallery images.
+    * images.url - Image URL.
+    * images.alt - Accessible alternative text.
+    * images.filename - Original filename.
+    * noimages - Message displayed when the gallery is empty.
+}}
+
+<div class="mod-photogallery" data-region="photogallery">
+
+    {{#hasimages}}
+        <div class="mod-photogallery-grid">
+           {{#images}}
+                <figure class="mod-photogallery-item">
+
+                    <a href="{{url}}"
+                    class="mod-photogallery-link"
+                    target="_blank"
+                    rel="noopener"
+                    data-action="open-image"
+                    data-image-url="{{url}}"
+                    data-image-alt="{{alt}}"
+                    data-image-title="{{filename}}"
+                    data-image-caption="{{caption}}">
+
+                        <img src="{{thumbnailurl}}"
+                            class="mod-photogallery-image"
+                            alt="{{alt}}"
+                            loading="lazy"
+                            decoding="async">
+                    </a>
+
+                    <figcaption class="mod-photogallery-caption"
+                            title="{{displaylabel}}">
+                        {{displaylabel}}
+                    </figcaption>
+
+                </figure>
+            {{/images}}
+        </div>
+    {{/hasimages}}
+
+    {{^hasimages}}
+        <div class="alert alert-info mb-0" role="status">
+            {{noimages}}
+        </div>
+    {{/hasimages}}
+
+</div>
