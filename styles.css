@@ -250,7 +250,7 @@
     justify-content: center;
     background: rgba(0, 0, 0, 0.62);
     color: #fff;
-    font-size: clamp(1.35rem, 3vw, 2.2rem);
+    font-size: 2.2rem;
     font-weight: 700;
     text-align: center;
 }
@@ -312,6 +312,10 @@
 
     .mod-photogallery-preview-button {
         width: 100%;
+    }
+
+    .mod-photogallery-preview-remaining {
+        font-size: 1.35rem;
     }
 }
 

@@ -180,7 +180,7 @@ final class restore_test extends \restore_date_testcase {
     /**
      * Creates files in a user draft area.
      *
-     * @param array<string, string> $files Filename-to-content map.
+     * @param array $files Filename-to-content map.
      * @return int Draft item ID.
      */
     private function create_draft_area(array $files): int {
@@ -210,6 +210,13 @@ final class restore_test extends \restore_date_testcase {
 
     /**
      * Creates a metadata record for an image.
+     *
+     * @param int $galleryid Gallery instance ID.
+     * @param \stored_file $file Stored image file.
+     * @param string $caption Image caption.
+     * @param string $alttext Image alternative text.
+     * @param int $sortorder Image sort order.
+     * @return void
      */
     private function create_metadata(
         int $galleryid,
@@ -253,6 +260,12 @@ final class restore_test extends \restore_date_testcase {
 
     /**
      * Asserts restored metadata values.
+     *
+     * @param \stdClass $record Restored metadata record.
+     * @param string $caption Expected image caption.
+     * @param string $alttext Expected image alternative text.
+     * @param int $sortorder Expected image sort order.
+     * @return void
      */
     private function assert_metadata(
         \stdClass $record,

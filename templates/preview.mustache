@@ -4,6 +4,29 @@
     @template mod_photogallery/preview
 
     Course page gallery mosaic.
+
+    Example context (json):
+    {
+        "hasintro": true,
+        "intro": "<p>Gallery introduction</p>",
+        "hasimages": true,
+        "images": [
+            {
+                "url": "https://example.com/photo.jpg",
+                "thumbnailurl": "https://example.com/photo-thumb.jpg",
+                "alt": "A mountain landscape",
+                "filename": "photo.jpg",
+                "caption": "Mountain landscape",
+                "positionclass": "mod-photogallery-preview-position-1",
+                "showremaining": true,
+                "remaininglabel": "+2"
+            }
+        ],
+        "totalphotoslabel": "3 photos",
+        "galleryurl": "https://example.com/gallery",
+        "viewmorelabel": "View gallery",
+        "noimages": "No images are available."
+    }
 }}
 
 <div class="mod-photogallery-preview"

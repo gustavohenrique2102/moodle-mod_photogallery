@@ -12,6 +12,22 @@
     * images.alt - Accessible alternative text.
     * images.filename - Original filename.
     * noimages - Message displayed when the gallery is empty.
+
+    Example context (json):
+    {
+        "hasimages": true,
+        "images": [
+            {
+                "url": "https://example.com/photo.jpg",
+                "thumbnailurl": "https://example.com/photo-thumb.jpg",
+                "alt": "A mountain landscape",
+                "filename": "photo.jpg",
+                "caption": "Mountain landscape",
+                "displaylabel": "Mountain landscape"
+            }
+        ],
+        "noimages": "No images are available."
+    }
 }}
 
 <div class="mod-photogallery" data-region="photogallery">

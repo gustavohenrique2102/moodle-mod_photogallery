@@ -544,7 +544,7 @@ final class lib_test extends \advanced_testcase {
     /**
      * Creates files in a user draft area.
      *
-     * @param array<string, string> $files Filename-to-content map.
+     * @param array $files Filename-to-content map.
      * @return int Draft item ID.
      */
     private function create_draft_area(array $files): int {
@@ -575,7 +575,7 @@ final class lib_test extends \advanced_testcase {
     /**
      * Creates a ZIP file in a user draft area.
      *
-     * @param array<string, string> $entries Archive-path-to-content map.
+     * @param array $entries Archive-path-to-content map.
      * @return int Draft item ID.
      */
     private function create_zip_draft(array $entries): int {
@@ -609,6 +609,13 @@ final class lib_test extends \advanced_testcase {
 
     /**
      * Creates a metadata record for an image.
+     *
+     * @param int $galleryid Gallery instance ID.
+     * @param \stored_file $file Stored image file.
+     * @param string $caption Image caption.
+     * @param string $alttext Image alternative text.
+     * @param int $sortorder Image sort order.
+     * @return \stdClass Created metadata record.
      */
     private function create_metadata(
         int $galleryid,
@@ -653,6 +660,10 @@ final class lib_test extends \advanced_testcase {
 
     /**
      * Asserts the Moodle error code produced by a callback.
+     *
+     * @param callable $callback Callback expected to throw a Moodle exception.
+     * @param string $expectederrorcode Expected Moodle error code.
+     * @return void
      */
     private function assert_moodle_exception_errorcode(
         callable $callback,
