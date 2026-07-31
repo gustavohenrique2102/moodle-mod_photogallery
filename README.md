@@ -1,3 +1,5 @@
+[![Moodle Plugin CI](https://github.com/gustavohenrique2102/moodle-mod_photogallery/actions/workflows/moodle-ci.yml/badge.svg)](https://github.com/gustavohenrique2102/moodle-mod_photogallery/actions/workflows/moodle-ci.yml)
+
 # Photo gallery (`mod_photogallery`)
 
 Activity module for Moodle 5.2 that displays photographs as a course-page
