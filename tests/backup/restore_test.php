@@ -39,9 +39,6 @@ require_once($CFG->libdir . '/phpunit/classes/restore_date_testcase.php');
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_photogallery_activity_task::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(\backup_photogallery_activity_structure_step::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_photogallery_activity_structure_step::class)]
-/**
- * Covers backup and restore flows for stored gallery media.
- */
 final class restore_test extends \restore_date_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =

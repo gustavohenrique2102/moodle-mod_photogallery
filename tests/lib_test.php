@@ -56,9 +56,6 @@ namespace mod_photogallery;
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_cm_info_view')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_queue_missing_previews')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_view')]
-/**
- * Covers the activity library integration points.
- */
 final class lib_test extends \advanced_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =

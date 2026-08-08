@@ -36,9 +36,6 @@ use mod_photogallery\local\zip_importer;
 #[\PHPUnit\Framework\Attributes\CoversClass(image_validator::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(zip_importer::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(thumbnail_manager::class)]
-/**
- * Covers the media sanitisation and background preview pipeline.
- */
 final class media_pipeline_test extends \advanced_testcase {
     /** Valid, GD-decodable 1x1 red PNG. */
     private const PNG_RED =
