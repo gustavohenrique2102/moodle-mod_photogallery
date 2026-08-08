@@ -89,3 +89,21 @@ database type, steps to reproduce the issue, and any relevant error messages.
 ## License
 
 GNU GPL v3 or later.
+
+## Screenshots
+
+### Course page mosaic
+
+![Course page mosaic](docs/screenshots/01-course-page-mosaic.png)
+
+### Full gallery
+
+![Full gallery](docs/screenshots/02-full-gallery.png)
+
+### Accessible photograph viewer
+
+![Photograph viewer](docs/screenshots/03-lightbox-viewer.png)
+
+### Gallery settings
+
+![Gallery settings](docs/screenshots/04-gallery-settings.png)
