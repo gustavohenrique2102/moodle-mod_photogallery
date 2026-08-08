@@ -93,15 +93,24 @@ class gallery implements renderable, templatable {
     public function export_for_template(renderer_base $output) {
         $data = new stdClass();
 
-        $formattedname = format_string(
+        $formattedname = strip_tags(format_string(
             $this->galleryname,
             true,
-            ['context' => $this->context]
-        );
+            [
+                'context' => $this->context,
+                'escape' => false,
+            ]
+        ));
 
         $data->hasimages = !empty($this->files);
         $data->images = [];
         $data->noimages = get_string('noimages', 'mod_photogallery');
+
+        $previews = \mod_photogallery\local\thumbnail_manager::queue_missing_for_mode(
+            $this->files,
+            $this->context,
+            'grid'
+        );
 
         $position = 0;
 
@@ -127,12 +136,7 @@ class gallery implements renderable, templatable {
                 $file->get_timemodified()
             );
 
-            $previewfile =
-                \photogallery_get_resized_preview(
-                    $file,
-                    $this->context,
-                    'grid'
-                );
+            $previewfile = $previews[$file->get_contenthash()] ?? null;
 
             $thumbnailfile = $previewfile ?? $file;
 

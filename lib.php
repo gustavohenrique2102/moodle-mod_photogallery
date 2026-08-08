@@ -26,9 +26,9 @@
  * Declares the Moodle features supported by this plugin.
  *
  * @param string $feature Feature being checked.
- * @return bool|string|null
+ * @return bool|int|string|null
  */
-function photogallery_supports(string $feature): bool|string|null {
+function photogallery_supports(string $feature): bool|int|string|null {
     return match ($feature) {
         FEATURE_MOD_ARCHETYPE => MOD_ARCHETYPE_RESOURCE,
         FEATURE_GROUPS => false,
@@ -75,7 +75,7 @@ function photogallery_get_filemanager_options(stdClass $course): array {
         'maxfiles' => 100,
 
         // Aceita apenas imagens compatíveis com a web.
-        'accepted_types' => ['web_image'],
+        'accepted_types' => ['.jpg', '.jpeg', '.png', '.webp'],
 
         // Armazena uma cópia interna no Moodle.
         'return_types' => FILE_INTERNAL,
@@ -105,6 +105,234 @@ function photogallery_get_zip_filepicker_options(stdClass $course): array {
 }
 
 /**
+ * Copies a user draft area to an immutable server-side staging area.
+ *
+ * The returned ID is always positive, including for an empty source area. This
+ * lets an empty, validated submission intentionally remove all permanent files
+ * without reading a user-editable draft again after validation.
+ *
+ * @param int $sourceitemid Source draft item ID, or zero for an empty area.
+ * @return int Snapshot draft item ID.
+ */
+function photogallery_create_draft_snapshot(int $sourceitemid): int {
+    global $USER;
+
+    $snapshotitemid = file_get_unused_draft_itemid();
+    if ($sourceitemid <= 0) {
+        return $snapshotitemid;
+    }
+
+    $usercontext = \core\context\user::instance(
+        $USER->id,
+        MUST_EXIST
+    );
+    $filestorage = get_file_storage();
+
+    try {
+        $sourcefiles = $filestorage->get_area_files(
+            $usercontext->id,
+            'user',
+            'draft',
+            $sourceitemid,
+            'id ASC',
+            false
+        );
+
+        foreach ($sourcefiles as $sourcefile) {
+            $filestorage->create_file_from_storedfile(
+                [
+                    'contextid' => $usercontext->id,
+                    'component' => 'user',
+                    'filearea' => 'draft',
+                    'itemid' => $snapshotitemid,
+                ],
+                $sourcefile
+            );
+        }
+    } catch (\Throwable $exception) {
+        $filestorage->delete_area_files(
+            $usercontext->id,
+            'user',
+            'draft',
+            $snapshotitemid
+        );
+        throw $exception;
+    }
+
+    return $snapshotitemid;
+}
+
+/**
+ * Deletes private draft snapshots created by this plugin.
+ *
+ * @param int[] $snapshotitemids Snapshot draft item IDs.
+ * @return void
+ */
+function photogallery_cleanup_draft_snapshots(
+    array $snapshotitemids
+): void {
+    global $USER;
+
+    $snapshotitemids = array_unique(array_filter(
+        array_map('intval', $snapshotitemids),
+        static fn(int $itemid): bool => $itemid > 0
+    ));
+    if (empty($snapshotitemids)) {
+        return;
+    }
+
+    $usercontext = \core\context\user::instance(
+        $USER->id,
+        MUST_EXIST
+    );
+    $filestorage = get_file_storage();
+    foreach ($snapshotitemids as $snapshotitemid) {
+        $filestorage->delete_area_files(
+            $usercontext->id,
+            'user',
+            'draft',
+            $snapshotitemid
+        );
+    }
+}
+
+/**
+ * Validates, imports and sanitises submitted image drafts before persistence.
+ *
+ * ZIP photographs are first staged in the regular images draft. Nothing in
+ * the activity context is changed until all submitted content is valid and
+ * safe to store.
+ *
+ * @param int $imagesdraftitemid Images draft item ID.
+ * @param int $zipdraftitemid ZIP draft item ID.
+ * @param int $coverdraftitemid Cover draft item ID.
+ * @param stdClass $course Course record.
+ * @return array{imagesdraftitemid: int, coverdraftitemid: int,
+ *     imagesanitized: array, coversanitized: array}
+ */
+function photogallery_prepare_image_drafts(
+    int $imagesdraftitemid,
+    int $zipdraftitemid,
+    int $coverdraftitemid,
+    stdClass $course
+): array {
+    $imageoptions = photogallery_get_filemanager_options($course);
+    $coveroptions = photogallery_get_cover_filemanager_options($course);
+
+    $initialimagestats =
+        \mod_photogallery\local\image_validator::get_draft_stats(
+            $imagesdraftitemid,
+            $imageoptions
+        );
+    $initialcoverstats =
+        \mod_photogallery\local\image_validator::get_draft_stats(
+            $coverdraftitemid,
+            $coveroptions
+        );
+
+    if ($zipdraftitemid > 0) {
+        \mod_photogallery\local\zip_importer::validate(
+            $zipdraftitemid,
+            $course,
+            $initialimagestats['count'] + $initialcoverstats['count'],
+            $initialimagestats['bytes'] + $initialcoverstats['bytes'],
+            $initialimagestats['pixels'] + $initialcoverstats['pixels']
+        );
+
+        if ($imagesdraftitemid <= 0) {
+            $imagesdraftitemid = file_get_unused_draft_itemid();
+        }
+
+        \mod_photogallery\local\zip_importer::import_to_draft(
+            $zipdraftitemid,
+            $imagesdraftitemid,
+            $course
+        );
+    }
+
+    $imagessnapshotid = 0;
+    $coversnapshotid = 0;
+
+    try {
+        // From this point onward only private snapshots are validated and saved.
+        $imagessnapshotid = photogallery_create_draft_snapshot(
+            $imagesdraftitemid
+        );
+        $coversnapshotid = photogallery_create_draft_snapshot(
+            $coverdraftitemid
+        );
+
+        $imagesanitized =
+            \mod_photogallery\local\image_validator::sanitize_draft_area(
+                $imagessnapshotid,
+                $imageoptions
+            );
+        $coversanitized =
+            \mod_photogallery\local\image_validator::sanitize_draft_area(
+                $coversnapshotid,
+                $coveroptions
+            );
+
+        // Recheck limits because re-encoding can change file sizes.
+        $imagestats = \mod_photogallery\local\image_validator::get_draft_stats(
+            $imagessnapshotid,
+            $imageoptions
+        );
+        $coverstats = \mod_photogallery\local\image_validator::get_draft_stats(
+            $coversnapshotid,
+            $coveroptions
+        );
+
+        if ($imagestats['count'] + $coverstats['count'] > 100) {
+            throw new moodle_exception(
+                'toomanyimages',
+                'mod_photogallery',
+                '',
+                100
+            );
+        }
+
+        $maxgallerybytes = 200 * 1024 * 1024;
+        if ($imagestats['bytes'] + $coverstats['bytes'] > $maxgallerybytes) {
+            throw new moodle_exception(
+                'galleryareatoolarge',
+                'mod_photogallery',
+                '',
+                display_size($maxgallerybytes)
+            );
+        }
+
+        if (
+            $imagestats['pixels'] + $coverstats['pixels']
+            > \mod_photogallery\local\image_validator::MAX_TOTAL_PIXELS
+        ) {
+            throw new moodle_exception(
+                'imagetotalpixelstoolarge',
+                'mod_photogallery',
+                '',
+                (int) (
+                    \mod_photogallery\local\image_validator::MAX_TOTAL_PIXELS
+                    / 1000000
+                )
+            );
+        }
+
+        return [
+            'imagesdraftitemid' => $imagessnapshotid,
+            'coverdraftitemid' => $coversnapshotid,
+            'imagesanitized' => $imagesanitized,
+            'coversanitized' => $coversanitized,
+        ];
+    } catch (\Throwable $exception) {
+        photogallery_cleanup_draft_snapshots([
+            $imagessnapshotid,
+            $coversnapshotid,
+        ]);
+        throw $exception;
+    }
+}
+
+/**
  * Creates a new Photo gallery activity instance.
  *
  * @param stdClass $photogallery Submitted activity data.
@@ -112,6 +340,31 @@ function photogallery_get_zip_filepicker_options(stdClass $course): array {
  * @return int New activity instance ID.
  */
 function photogallery_add_instance(
+    stdClass $photogallery,
+    $mform = null
+): int {
+    $lock = \mod_photogallery\local\media_lock::acquire(
+        (int) $photogallery->coursemodule
+    );
+
+    try {
+        return photogallery_add_instance_locked(
+            $photogallery,
+            $mform
+        );
+    } finally {
+        $lock->release();
+    }
+}
+
+/**
+ * Creates an activity while its course-module media lock is held.
+ *
+ * @param stdClass $photogallery Submitted activity data.
+ * @param mod_photogallery_mod_form|null $mform Activity form.
+ * @return int New activity instance ID.
+ */
+function photogallery_add_instance_locked(
     stdClass $photogallery,
     $mform = null
 ): int {
@@ -131,6 +384,16 @@ function photogallery_add_instance(
         $photogallery->coverimage ?? 0
     );
 
+    $course = get_course($photogallery->course);
+    $prepareddrafts = photogallery_prepare_image_drafts(
+        $imagesdraftitemid,
+        $zipdraftitemid,
+        $coverdraftitemid,
+        $course
+    );
+    $imagesdraftitemid = $prepareddrafts['imagesdraftitemid'];
+    $coverdraftitemid = $prepareddrafts['coverdraftitemid'];
+
     unset(
         $photogallery->images,
         $photogallery->importzip,
@@ -142,64 +405,101 @@ function photogallery_add_instance(
     $photogallery->timecreated = $time;
     $photogallery->timemodified = $time;
 
-    // Cria o registro da galeria.
-    $photogallery->id = $DB->insert_record(
-        'photogallery',
-        $photogallery
-    );
+    $transaction = $DB->start_delegated_transaction();
 
-    /*
-     * Relaciona o módulo do curso com a nova instância.
-     *
-     * Precisamos fazer isso antes de criar o contexto do módulo,
-     * pois os arquivos serão vinculados a esse contexto.
-     */
-    $DB->set_field(
-        'course_modules',
-        'instance',
-        $photogallery->id,
-        ['id' => $cmid]
-    );
-
-    $context = context_module::instance($cmid);
-    $course = get_course($photogallery->course);
-
-    // Move as imagens da área temporária para a área definitiva.
-    if ($imagesdraftitemid) {
-        file_save_draft_area_files(
-            $imagesdraftitemid,
-            $context->id,
-            'mod_photogallery',
-            'images',
-            0,
-            photogallery_get_filemanager_options(
-                $course
-            )
+    try {
+        // Cria o registro da galeria.
+        $photogallery->id = $DB->insert_record(
+            'photogallery',
+            $photogallery
         );
-    }
 
-    if ($zipdraftitemid) {
-        photogallery_import_zip(
-            $zipdraftitemid,
+        /*
+        * Relaciona o módulo do curso com a nova instância.
+        *
+        * Precisamos fazer isso antes de criar o contexto do módulo,
+        * pois os arquivos serão vinculados a esse contexto.
+        */
+        $DB->set_field(
+            'course_modules',
+            'instance',
+            $photogallery->id,
+            ['id' => $cmid]
+        );
+
+        $context = context_module::instance($cmid);
+
+        // Move as imagens da área temporária para a área definitiva.
+        try {
+            file_save_draft_area_files(
+                $imagesdraftitemid,
+                $context->id,
+                'mod_photogallery',
+                'images',
+                0,
+                photogallery_get_filemanager_options(
+                    $course
+                )
+            );
+
+            file_save_draft_area_files(
+                $coverdraftitemid,
+                $context->id,
+                'mod_photogallery',
+                'cover',
+                0,
+                photogallery_get_cover_filemanager_options(
+                    $course
+                )
+            );
+        } finally {
+            photogallery_cleanup_draft_snapshots([
+                $imagesdraftitemid,
+                $coverdraftitemid,
+            ]);
+        }
+
+        \mod_photogallery\local\metadata_manager::adopt_sanitized_content(
+            (int) $photogallery->id,
             $context,
-            $course
+            'images',
+            $prepareddrafts['imagesanitized']
         );
-    }
-
-    if ($coverdraftitemid > 0) {
-        file_save_draft_area_files(
-            $coverdraftitemid,
-            $context->id,
-            'mod_photogallery',
+        \mod_photogallery\local\metadata_manager::adopt_sanitized_content(
+            (int) $photogallery->id,
+            $context,
             'cover',
-            0,
-            photogallery_get_cover_filemanager_options(
-                $course
-            )
+            $prepareddrafts['coversanitized']
         );
+
+        \mod_photogallery\local\metadata_manager::sync_sortorder_from_files(
+            (int) $photogallery->id,
+            $context
+        );
+
+        photogallery_cleanup_generated_previews($context);
+
+        $completiontimeexpected = !empty($photogallery->completionexpected)
+        ? (int) $photogallery->completionexpected
+        : null;
+
+        \core_completion\api::update_completion_date_event(
+            $cmid,
+            'photogallery',
+            $photogallery->id,
+            $completiontimeexpected
+        );
+
+        $transaction->allow_commit();
+    } catch (\Throwable $exception) {
+        photogallery_cleanup_draft_snapshots([
+            $imagesdraftitemid,
+            $coverdraftitemid,
+        ]);
+        $transaction->rollback($exception);
     }
 
-    photogallery_generate_missing_previews(
+    photogallery_queue_missing_previews(
         (int) $photogallery->id,
         $context,
         (int) ($photogallery->previewcount ?? 6)
@@ -219,6 +519,31 @@ function photogallery_update_instance(
     stdClass $photogallery,
     $mform = null
 ): bool {
+    $lock = \mod_photogallery\local\media_lock::acquire(
+        (int) $photogallery->coursemodule
+    );
+
+    try {
+        return photogallery_update_instance_locked(
+            $photogallery,
+            $mform
+        );
+    } finally {
+        $lock->release();
+    }
+}
+
+/**
+ * Updates an activity while its course-module media lock is held.
+ *
+ * @param stdClass $photogallery Form data.
+ * @param mixed $mform Activity form.
+ * @return bool
+ */
+function photogallery_update_instance_locked(
+    stdClass $photogallery,
+    $mform = null
+): bool {
     global $DB;
 
     $cmid = (int) $photogallery->coursemodule;
@@ -234,6 +559,16 @@ function photogallery_update_instance(
         $photogallery->coverimage ?? 0
     );
 
+    $course = get_course($photogallery->course);
+    $prepareddrafts = photogallery_prepare_image_drafts(
+        $imagesdraftitemid,
+        $zipdraftitemid,
+        $coverdraftitemid,
+        $course
+    );
+    $imagesdraftitemid = $prepareddrafts['imagesdraftitemid'];
+    $coverdraftitemid = $prepareddrafts['coverdraftitemid'];
+
     unset(
         $photogallery->images,
         $photogallery->importzip,
@@ -243,64 +578,93 @@ function photogallery_update_instance(
     $photogallery->id = $photogallery->instance;
     $photogallery->timemodified = time();
 
-    $DB->update_record(
-        'photogallery',
-        $photogallery
-    );
+    $transaction = $DB->start_delegated_transaction();
 
-    $context = context_module::instance($cmid);
-    $course = get_course($photogallery->course);
-
-    /*
-     * Sincroniza o gerenciador de arquivos com a área permanente.
-     *
-     * Novos arquivos são adicionados.
-     * Arquivos removidos no formulário também são excluídos.
-     */
-    if ($imagesdraftitemid) {
-        file_save_draft_area_files(
-            $imagesdraftitemid,
-            $context->id,
-            'mod_photogallery',
-            'images',
-            0,
-            photogallery_get_filemanager_options(
-                $course
-            )
+    try {
+        $DB->update_record(
+            'photogallery',
+            $photogallery
         );
-    }
 
-    if ($coverdraftitemid > 0) {
-        file_save_draft_area_files(
-            $coverdraftitemid,
-            $context->id,
-            'mod_photogallery',
-            'cover',
-            0,
-            photogallery_get_cover_filemanager_options(
-                $course
-            )
-        );
-    }
+        $context = context_module::instance($cmid);
 
-    if ($zipdraftitemid) {
-        photogallery_import_zip(
-            $zipdraftitemid,
+        /*
+        * Sincroniza o gerenciador de arquivos com a área permanente.
+        *
+        * Novos arquivos são adicionados.
+        * Arquivos removidos no formulário também são excluídos.
+        */
+        try {
+            file_save_draft_area_files(
+                $imagesdraftitemid,
+                $context->id,
+                'mod_photogallery',
+                'images',
+                0,
+                photogallery_get_filemanager_options(
+                    $course
+                )
+            );
+
+            file_save_draft_area_files(
+                $coverdraftitemid,
+                $context->id,
+                'mod_photogallery',
+                'cover',
+                0,
+                photogallery_get_cover_filemanager_options(
+                    $course
+                )
+            );
+        } finally {
+            photogallery_cleanup_draft_snapshots([
+                $imagesdraftitemid,
+                $coverdraftitemid,
+            ]);
+        }
+
+        \mod_photogallery\local\metadata_manager::adopt_sanitized_content(
+            (int) $photogallery->id,
             $context,
-            $course
+            'images',
+            $prepareddrafts['imagesanitized']
         );
+        \mod_photogallery\local\metadata_manager::adopt_sanitized_content(
+            (int) $photogallery->id,
+            $context,
+            'cover',
+            $prepareddrafts['coversanitized']
+        );
+
+        \mod_photogallery\local\metadata_manager::sync_sortorder_from_files(
+            (int) $photogallery->id,
+            $context
+        );
+
+        // Remove previews whose source was removed or replaced before queuing.
+        photogallery_cleanup_generated_previews($context);
+
+        $completiontimeexpected = !empty($photogallery->completionexpected)
+        ? (int) $photogallery->completionexpected
+        : null;
+
+        \core_completion\api::update_completion_date_event(
+            $cmid,
+            'photogallery',
+            $photogallery->id,
+            $completiontimeexpected
+        );
+
+        $transaction->allow_commit();
+    } catch (\Throwable $exception) {
+        photogallery_cleanup_draft_snapshots([
+            $imagesdraftitemid,
+            $coverdraftitemid,
+        ]);
+        $transaction->rollback($exception);
     }
 
-    photogallery_cleanup_image_metadata(
-        (int) $photogallery->id,
-        $context
-    );
-
-    photogallery_cleanup_generated_previews(
-        $context
-    );
-
-    photogallery_generate_missing_previews(
+    photogallery_queue_missing_previews(
         (int) $photogallery->id,
         $context,
         (int) ($photogallery->previewcount ?? 6)
@@ -337,6 +701,34 @@ function photogallery_delete_instance(
         MUST_EXIST
     );
 
+    $lock = \mod_photogallery\local\media_lock::acquire(
+        (int) $cm->id
+    );
+
+    try {
+        return photogallery_delete_instance_locked($id, $cm);
+    } finally {
+        $lock->release();
+    }
+}
+
+/**
+ * Deletes an activity while its course-module media lock is held.
+ *
+ * @param int $id Gallery instance ID.
+ * @param stdClass $cm Course module record.
+ * @return bool
+ */
+function photogallery_delete_instance_locked(
+    int $id,
+    stdClass $cm
+): bool {
+    global $DB;
+
+    if (!$DB->record_exists('photogallery', ['id' => $id])) {
+        return false;
+    }
+
     $context =
         \core\context\module::instance(
             $cm->id,
@@ -346,6 +738,13 @@ function photogallery_delete_instance(
     if ($context === false) {
         return false;
     }
+
+    \core_completion\api::update_completion_date_event(
+        $cm->id,
+        'photogallery',
+        $id,
+        null
+    );
 
     $filestorage = get_file_storage();
 
@@ -390,6 +789,106 @@ function photogallery_get_images(context_module $context): array {
         'images',
         0,
         'sortorder ASC, id ASC',
+        false
+    );
+}
+
+/**
+ * Lists the gallery file areas exposed to Moodle's file browser.
+ *
+ * Generated thumbnails are deliberately excluded because they can be
+ * recreated from the original photographs.
+ *
+ * @param stdClass $course Course record.
+ * @param stdClass $cm Course module record.
+ * @param context $context Module context.
+ * @return array<string, string>
+ */
+function photogallery_get_file_areas(
+    $course,
+    $cm,
+    $context
+): array {
+    return [
+        'images' => get_string('images', 'mod_photogallery'),
+        'cover' => get_string('coverimage', 'mod_photogallery'),
+    ];
+}
+
+/**
+ * Returns file information for Moodle's file browser and Server files.
+ *
+ * This integration is intentionally read-only. Gallery writes must pass
+ * through the activity form so its type, count and storage limits apply.
+ *
+ * @param file_browser $browser File browser instance.
+ * @param array $areas Available file areas.
+ * @param stdClass $course Course record.
+ * @param stdClass $cm Course module record.
+ * @param context $context Module context.
+ * @param string $filearea Requested file area.
+ * @param int $itemid File item ID.
+ * @param string|null $filepath File path.
+ * @param string|null $filename File name.
+ * @return file_info|null
+ */
+function photogallery_get_file_info(
+    $browser,
+    $areas,
+    $course,
+    $cm,
+    $context,
+    $filearea,
+    $itemid,
+    $filepath,
+    $filename
+) {
+    global $CFG;
+
+    if (
+        !isset($areas[$filearea])
+        || !in_array($filearea, ['images', 'cover'], true)
+        || (int) $itemid !== 0
+        || !has_capability('mod/photogallery:view', $context)
+    ) {
+        return null;
+    }
+
+    $filepath = $filepath ?? '/';
+    $filename = $filename ?? '.';
+    $filestorage = get_file_storage();
+
+    $storedfile = $filestorage->get_file(
+        $context->id,
+        'mod_photogallery',
+        $filearea,
+        0,
+        $filepath,
+        $filename
+    );
+
+    if (!$storedfile) {
+        if ($filepath !== '/' || $filename !== '.') {
+            return null;
+        }
+
+        $storedfile = new virtual_root_file(
+            $context->id,
+            'mod_photogallery',
+            $filearea,
+            0
+        );
+    }
+
+    return new file_info_stored(
+        $browser,
+        $context,
+        $storedfile,
+        $CFG->wwwroot . '/pluginfile.php',
+        $areas[$filearea],
+        true,
+        true,
+        false,
         false
     );
 }
@@ -470,6 +969,17 @@ function photogallery_pluginfile(
         $filepath = '/' . implode('/', $args) . '/';
     }
 
+    // Failure markers and any unexpected thumbnail paths are private internals.
+    if (
+        $filearea === 'thumbs'
+        && (
+            !in_array($filepath, ['/grid/', '/mosaic/'], true)
+            || !preg_match('/^[a-f0-9]{40}$/D', $filename)
+        )
+    ) {
+        return false;
+    }
+
     // Custom thumbnails are stored in the thumbs file area.
     // Core preview generation is not used by this plugin.
     unset($options['preview']);
@@ -489,12 +999,22 @@ function photogallery_pluginfile(
         return false;
     }
 
+    // Legacy active or unsupported formats remain stored but are never served.
+    if (
+        in_array($filearea, ['images', 'cover'], true)
+        && !in_array($file->get_mimetype(), ['image/jpeg', 'image/png', 'image/webp'], true)
+    ) {
+        return false;
+    }
+
     // Restricts the capabilities of files displayed in the browser.
+    header('X-Content-Type-Options: nosniff');
     if (!$forcedownload) {
         header(
-            "Content-Security-Policy: default-src 'none'; "
+            "Content-Security-Policy: sandbox; default-src 'none'; "
             . "img-src 'self'; media-src 'self'"
         );
+        header('Referrer-Policy: no-referrer');
     }
 
     // File delivery no longer needs to keep the user session locked.
@@ -673,16 +1193,17 @@ function photogallery_cm_info_view(\cm_info $cm): void {
         $previewcount = 6;
     }
 
-    $allimages = photogallery_get_display_images(
-        $modulecontext,
-        (int) $photogallery->id
-    );
-
-    $allimages = array_values($allimages);
-
     $metadata = photogallery_get_image_metadata(
         (int) $photogallery->id
     );
+
+    $allimages = photogallery_get_display_images(
+        $modulecontext,
+        (int) $photogallery->id,
+        $metadata
+    );
+
+    $allimages = array_values($allimages);
 
     $previewimages = array_slice(
         $allimages,
@@ -723,7 +1244,8 @@ function photogallery_cm_info_view(\cm_info $cm): void {
         $galleryurl,
         count($allimages),
         $metadata,
-        $intro
+        $intro,
+        $allimages
     );
 
     $html = $OUTPUT->render($preview);
@@ -764,7 +1286,7 @@ function photogallery_get_cover_filemanager_options(
         'maxbytes' => $maxbytes,
         'areamaxbytes' => $maxbytes,
         'maxfiles' => 1,
-        'accepted_types' => ['web_image'],
+        'accepted_types' => ['.jpg', '.jpeg', '.png', '.webp'],
         'return_types' => FILE_INTERNAL,
     ];
 }
@@ -795,20 +1317,9 @@ function photogallery_get_cover_image(
 
     $cover = reset($files);
 
-    return $cover instanceof stored_file
-        ? $cover
-        : null;
+    return $cover instanceof stored_file ? $cover : null;
 }
 
-/**
- * Returns gallery images in their display order.
- *
- * The featured image is displayed first. If the same file was also
- * uploaded to the regular image area, it is not displayed twice.
- *
- * @param \core\context\module $context Module context.
- * @return stored_file[]
- */
 /**
  * Returns gallery images in their display order.
  *
@@ -817,19 +1328,29 @@ function photogallery_get_cover_image(
  *
  * @param \core\context\module $context Module context.
  * @param int $photogalleryid Gallery instance ID.
+ * @param stdClass[]|null $metadata Preloaded metadata indexed by pathname hash.
  * @return stored_file[]
  */
 function photogallery_get_display_images(
     \core\context\module $context,
-    int $photogalleryid
+    int $photogalleryid,
+    ?array $metadata = null
 ): array {
-    $images = array_values(
-        photogallery_get_images($context)
-    );
+    $supportedmimetypes = ['image/jpeg', 'image/png', 'image/webp'];
+    $images = array_values(array_filter(
+        photogallery_get_images($context),
+        static fn(stored_file $file): bool => in_array(
+            $file->get_mimetype(),
+            $supportedmimetypes,
+            true
+        )
+    ));
 
-    $metadata = photogallery_get_image_metadata(
-        $photogalleryid
-    );
+    if ($metadata === null) {
+        $metadata = photogallery_get_image_metadata(
+            $photogalleryid
+        );
+    }
 
     $sortableimages = [];
 
@@ -882,7 +1403,10 @@ function photogallery_get_display_images(
         $context
     );
 
-    if (!$cover instanceof stored_file) {
+    if (
+        !$cover instanceof stored_file
+        || !in_array($cover->get_mimetype(), $supportedmimetypes, true)
+    ) {
         return $orderedimages;
     }
 
@@ -960,6 +1484,26 @@ function photogallery_get_resized_preview(
             $context,
             $mode
         );
+}
+
+/**
+ * Queues background generation of missing gallery previews.
+ *
+ * @param int $photogalleryid Gallery instance ID.
+ * @param \core\context\module $context Activity context.
+ * @param int $previewcount Number displayed in the course mosaic.
+ * @return void
+ */
+function photogallery_queue_missing_previews(
+    int $photogalleryid,
+    \core\context\module $context,
+    int $previewcount
+): void {
+    photogallery_generate_missing_previews(
+        $photogalleryid,
+        $context,
+        $previewcount
+    );
 }
 
 /**

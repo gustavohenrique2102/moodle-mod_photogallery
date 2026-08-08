@@ -154,5 +154,125 @@ function xmldb_photogallery_upgrade(
         );
     }
 
+    if ($oldversion < 2026080700) {
+        $table = new xmldb_table('photogallery_image');
+        $field = new xmldb_field(
+            'contenthash',
+            XMLDB_TYPE_CHAR,
+            '40',
+            null,
+            null,
+            null,
+            null,
+            'pathnamehash'
+        );
+
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        /*
+         * Populate the content identity for existing metadata. The joins
+         * verify that the referenced file belongs to the same gallery
+         * context and to one of its permanent source areas.
+         */
+        $moduleid = $DB->get_field(
+            'modules',
+            'id',
+            ['name' => 'photogallery'],
+            MUST_EXIST
+        );
+
+        $sql = "SELECT pgi.id, f.contenthash
+                  FROM {photogallery_image} pgi
+                  JOIN {photogallery} pg
+                    ON pg.id = pgi.photogalleryid
+                  JOIN {course_modules} cm
+                    ON cm.instance = pg.id
+                   AND cm.module = :moduleid
+                  JOIN {context} ctx
+                    ON ctx.contextlevel = :contextlevel
+                   AND ctx.instanceid = cm.id
+                  JOIN {files} f
+                    ON f.contextid = ctx.id
+                   AND f.component = :component
+                   AND (f.filearea = :images OR f.filearea = :cover)
+                   AND f.itemid = 0
+                   AND f.pathnamehash = pgi.pathnamehash
+                 WHERE pgi.contenthash IS NULL
+                    OR pgi.contenthash = :emptyhash";
+
+        $records = $DB->get_recordset_sql($sql, [
+            'moduleid' => $moduleid,
+            'contextlevel' => CONTEXT_MODULE,
+            'component' => 'mod_photogallery',
+            'images' => 'images',
+            'cover' => 'cover',
+            'emptyhash' => '',
+        ]);
+
+        foreach ($records as $record) {
+            $DB->set_field(
+                'photogallery_image',
+                'contenthash',
+                $record->contenthash,
+                ['id' => $record->id]
+            );
+        }
+
+        $records->close();
+
+        $DB->set_field_select(
+            'photogallery_image',
+            'contenthash',
+            '',
+            'contenthash IS NULL'
+        );
+
+        $field = new xmldb_field(
+            'contenthash',
+            XMLDB_TYPE_CHAR,
+            '40',
+            null,
+            XMLDB_NOTNULL,
+            null,
+            null,
+            'pathnamehash'
+        );
+        $dbman->change_field_notnull($table, $field);
+        $dbman->change_field_default($table, $field);
+
+        /*
+         * Version 0.2 declared an empty-string default for name. Remove it
+         * so upgraded sites match clean installations.
+         */
+        $table = new xmldb_table('photogallery');
+        $field = new xmldb_field(
+            'name',
+            XMLDB_TYPE_CHAR,
+            '255',
+            null,
+            XMLDB_NOTNULL,
+            null,
+            null,
+            'course'
+        );
+
+        $dbman->change_field_default($table, $field);
+
+        set_config(
+            'mediasanitizedversion',
+            0,
+            'mod_photogallery'
+        );
+        \mod_photogallery\task\sanitize_existing_media::queue();
+
+        upgrade_mod_savepoint(
+            true,
+            2026080700,
+            'photogallery'
+        );
+    }
+
     return true;
 }

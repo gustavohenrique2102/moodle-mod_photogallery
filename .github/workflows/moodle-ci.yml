@@ -73,13 +73,14 @@ jobs:
 
     steps:
       - name: Checkout do plugin
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
         with:
           path: plugin
+          persist-credentials: false
 
       - name: Configurar PHP ${{ matrix.php }}
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
 
         with:
           php-version: ${{ matrix.php }}
@@ -107,7 +108,7 @@ jobs:
             --prefer-dist \
             moodlehq/moodle-plugin-ci \
             ci \
-            ^4
+            4.5.11
 
           echo "$(cd ci/bin && pwd)" >> "$GITHUB_PATH"
           echo "$(cd ci/vendor/bin && pwd)" >> "$GITHUB_PATH"
@@ -125,6 +126,20 @@ jobs:
         env:
           DB: ${{ matrix.database }}
           MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: Validar pacote de distribuição
+        run: |
+          git -C plugin archive \
+            --format=zip \
+            --prefix=photogallery/ \
+            HEAD \
+            --output=../photogallery.zip
+
+          if unzip -Z1 photogallery.zip \
+            | grep -E '(^|/)\.(git|svn|hg)(/|$)'; then
+              echo "O pacote contém metadados de controle de versão."
+              exit 1
+          fi
 
       - name: PHP Lint
         if: ${{ !cancelled() }}

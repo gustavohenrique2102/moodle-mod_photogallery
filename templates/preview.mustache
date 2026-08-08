@@ -63,13 +63,34 @@
                               aria-hidden="true">
                             {{remaininglabel}}
                         </span>
+                        <span class="visually-hidden"
+                              data-region="remaining-photos-notice"
+                              hidden>
+                            {{remainingaccessiblelabel}}
+                        </span>
                     {{/showremaining}}
 
-                    <span class="visually-hidden">
-                        {{filename}}
+                    <span class="visually-hidden"
+                          data-region="new-window-notice">
+                        {{#str}} opensinnewwindowbracketed, core {{/str}}
                     </span>
                 </a>
             {{/images}}
+
+            {{! Additional modal entries make the +N promise truthful when JavaScript is active. }}
+            {{#hiddenimages}}
+                <a href="{{url}}"
+                   hidden
+                   tabindex="-1"
+                   aria-hidden="true"
+                   target="_blank"
+                   rel="noopener"
+                   data-action="open-image"
+                   data-image-url="{{url}}"
+                   data-image-alt="{{alt}}"
+                   data-image-title="{{filename}}"
+                   data-image-caption="{{caption}}"></a>
+            {{/hiddenimages}}
 
         </div>
 

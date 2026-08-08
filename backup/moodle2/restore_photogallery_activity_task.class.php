@@ -86,6 +86,56 @@ class restore_photogallery_activity_task extends restore_activity_task {
                 '/mod/photogallery/editmetadata.php?id=$1',
                 'course_module'
             ),
+
+            new restore_decode_rule(
+                'PHOTOGALLERYINDEX',
+                '/mod/photogallery/index.php?id=$1',
+                'course'
+            ),
+        ];
+    }
+
+    /**
+     * Defines legacy activity log rules used during restore.
+     *
+     * @return restore_log_rule[]
+     */
+    public static function define_restore_log_rules() {
+        return [
+            new restore_log_rule(
+                'photogallery',
+                'add',
+                'view.php?id={course_module}',
+                '{photogallery}'
+            ),
+            new restore_log_rule(
+                'photogallery',
+                'edit',
+                'edit.php?id={course_module}',
+                '{photogallery}'
+            ),
+            new restore_log_rule(
+                'photogallery',
+                'view',
+                'view.php?id={course_module}',
+                '{photogallery}'
+            ),
+        ];
+    }
+
+    /**
+     * Defines legacy course-level log rules used during restore.
+     *
+     * @return restore_log_rule[]
+     */
+    public static function define_restore_log_rules_for_course() {
+        return [
+            new restore_log_rule(
+                'photogallery',
+                'view all',
+                'index.php?id={course}',
+                null
+            ),
         ];
     }
 }

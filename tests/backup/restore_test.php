@@ -31,20 +31,22 @@ require_once($CFG->libdir . '/phpunit/classes/restore_date_testcase.php');
  */
 #[\PHPUnit\Framework\Attributes\Group('mod_photogallery')]
 #[\PHPUnit\Framework\Attributes\Group('backup')]
+#[\PHPUnit\Framework\Attributes\CoversClass(\backup_photogallery_activity_task::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\restore_photogallery_activity_task::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(\backup_photogallery_activity_structure_step::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_photogallery_activity_structure_step::class)]
 final class restore_test extends \restore_date_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6Y1sAAAAASUVORK5CYII=';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNgYGAAAAAEAAGjChXjAAAAAElFTkSuQmCC';
 
     /** A second valid 1x1 PNG image with different content. */
     private const PNG_TWO =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNg+M8AAAICAQAuFKzOAAAAAElFTkSuQmCC';
 
-    /** A valid 1x1 GIF image. */
-    private const GIF_ONE =
-        'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    /** A third valid 1x1 PNG image with different content. */
+    private const PNG_THREE =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWP4z8AAAAMBAQCc479ZAAAAAElFTkSuQmCC';
 
     public static function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
@@ -64,7 +66,7 @@ final class restore_test extends \restore_date_testcase {
             'photo-b.png' => $this->png_two(),
         ]);
         $coverdraftid = $this->create_draft_area([
-            'cover.gif' => $this->gif_one(),
+            'cover.png' => $this->png_three(),
         ]);
 
         [$course, $gallery] = $this->create_course_and_module(
@@ -135,7 +137,7 @@ final class restore_test extends \restore_date_testcase {
         );
 
         $this->assertInstanceOf(\stored_file::class, $restoredcover);
-        $this->assertSame('cover.gif', $restoredcover->get_filename());
+        $this->assertSame('cover.png', $restoredcover->get_filename());
         $this->assertArrayHasKey('photo-a.png', $restoredfilesbyname);
         $this->assertArrayHasKey('photo-b.png', $restoredfilesbyname);
 
@@ -172,8 +174,65 @@ final class restore_test extends \restore_date_testcase {
         );
 
         $this->assertSame(
-            ['cover.gif', 'photo-b.png', 'photo-a.png'],
+            ['cover.png', 'photo-b.png', 'photo-a.png'],
             $displaynames
+        );
+    }
+
+    /**
+     * Tests backup link encoding and all mandatory restore rule callbacks.
+     */
+    public function test_backup_and_restore_rules_are_complete(): void {
+        global $CFG;
+
+        require_once(
+            $CFG->dirroot . '/backup/util/includes/backup_includes.php'
+        );
+        require_once(
+            $CFG->dirroot . '/backup/util/includes/restore_includes.php'
+        );
+        require_once(
+            $CFG->dirroot .
+            '/mod/photogallery/backup/moodle2/' .
+            'backup_photogallery_activity_task.class.php'
+        );
+        require_once(
+            $CFG->dirroot .
+            '/mod/photogallery/backup/moodle2/' .
+            'restore_photogallery_activity_task.class.php'
+        );
+
+        $content = implode(' ', [
+            $CFG->wwwroot . '/mod/photogallery/view.php?id=21',
+            $CFG->wwwroot . '/mod/photogallery/editmetadata.php?id=22',
+            $CFG->wwwroot . '/mod/photogallery/index.php?id=23',
+        ]);
+        $encoded = \backup_photogallery_activity_task::encode_content_links(
+            $content
+        );
+
+        $this->assertStringContainsString(
+            '$@PHOTOGALLERYVIEWBYID*21@$',
+            $encoded
+        );
+        $this->assertStringContainsString(
+            '$@PHOTOGALLERYEDITBYID*22@$',
+            $encoded
+        );
+        $this->assertStringContainsString(
+            '$@PHOTOGALLERYINDEX*23@$',
+            $encoded
+        );
+
+        $this->assertCount(
+            3,
+            \restore_photogallery_activity_task::define_decode_rules()
+        );
+        $this->assertNotEmpty(
+            \restore_photogallery_activity_task::define_restore_log_rules()
+        );
+        $this->assertNotEmpty(
+            \restore_photogallery_activity_task::define_restore_log_rules_for_course()
         );
     }
 
@@ -231,9 +290,10 @@ final class restore_test extends \restore_date_testcase {
         $DB->insert_record(
             'photogallery_image',
             (object) [
-                'photogalleryid' => $galleryid,
-                'pathnamehash' => $file->get_pathnamehash(),
-                'caption' => $caption,
+            'photogalleryid' => $galleryid,
+            'pathnamehash' => $file->get_pathnamehash(),
+            'contenthash' => $file->get_contenthash(),
+            'caption' => $caption,
                 'alttext' => $alttext,
                 'sortorder' => $sortorder,
                 'timecreated' => $now,
@@ -297,11 +357,11 @@ final class restore_test extends \restore_date_testcase {
     }
 
     /**
-     * Returns the valid GIF fixture.
+     * Returns the third valid PNG fixture.
      *
      * @return string
      */
-    private function gif_one(): string {
-        return base64_decode(self::GIF_ONE, true);
+    private function png_three(): string {
+        return base64_decode(self::PNG_THREE, true);
     }
 }

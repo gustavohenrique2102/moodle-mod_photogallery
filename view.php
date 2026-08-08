@@ -164,14 +164,15 @@ if (trim((string) $photogallery->intro) !== '') {
     );
 }
 
-// Retrieves every gallery image.
-$images = photogallery_get_display_images(
-    $context,
+$metadata = photogallery_get_image_metadata(
     (int) $photogallery->id
 );
 
-$metadata = photogallery_get_image_metadata(
-    (int) $photogallery->id
+// Retrieves every gallery image using the metadata already loaded above.
+$images = photogallery_get_display_images(
+    $context,
+    (int) $photogallery->id,
+    $metadata
 );
 
 // Prepares and renders the gallery.

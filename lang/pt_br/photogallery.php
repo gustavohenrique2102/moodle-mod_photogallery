@@ -24,6 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+$string['animatedimagenotsupported'] =
+    'A fotografia "{$a}" é animada. Apenas imagens estáticas JPEG, PNG e WebP são permitidas.';
 $string['backtogallery'] =
     'Voltar para a galeria';
 $string['batchuploadinfo'] =
@@ -38,19 +40,35 @@ $string['editmetadata'] =
     'Gerenciar galeria';
 $string['editmetadatatitle'] =
     'Gerenciar galeria: {$a}';
+$string['eventimagemetadataupdated'] =
+    'Metadados da imagem atualizados';
 $string['featuredimagefixed'] =
     'A imagem em destaque permanece na primeira posição. Para substituí-la, edite as configurações da galeria.';
 $string['featuredimageposition'] =
     'Posição 1 — imagem em destaque fixa';
+$string['galleryareatoolarge'] =
+    'As fotografias ultrapassam o limite combinado de armazenamento da galeria de {$a}.';
 $string['gallerysettings'] = 'Configurações da galeria';
 $string['imagealt'] = 'Fotografia {$a->number} da galeria {$a->gallery}';
+$string['imagedimensionstoolarge'] =
+    'A fotografia "{$a->filename}" ultrapassa o limite de {$a->maxdimension} pixels por lado ou {$a->maxmegapixels} megapixels.';
+$string['imageposition'] =
+    'Fotografia {$a->current} de {$a->total}';
+$string['imageprocessingunavailable'] =
+    'O servidor não consegue processar com segurança o formato da imagem "{$a}".';
 $string['images'] = 'Fotografias';
 $string['images_help'] =
-    'Envie as fotografias que farão parte da galeria. Nesta primeira versão, são permitidas até 100 imagens, com limite de 10 MB por arquivo e 200 MB no total.';
+    'Envie fotografias estáticas JPEG, PNG ou WebP. A galeria pode conter até 100 fotografias, incluindo a imagem em destaque, com limite de 10 MB por arquivo e 200 MB no total. Gerencie a ordem de exibição em “Gerenciar galeria”.';
+$string['imagetoolarge'] =
+    'A fotografia "{$a}" ultrapassa o tamanho permitido por arquivo.';
+$string['imagetotalpixelstoolarge'] =
+    'As fotografias selecionadas ultrapassam o limite combinado de {$a} megapixels decodificados.';
 $string['importseparator'] = 'OU';
 $string['importzip'] = 'Importar pasta compactada';
 $string['importzip_help'] =
-    'Compacte a pasta de fotografias no formato ZIP e envie o arquivo. As imagens serão extraídas e adicionadas à galeria automaticamente. O arquivo ZIP não será armazenado na galeria.';
+    'Compacte fotografias estáticas JPEG, PNG ou WebP em um arquivo ZIP. As imagens compatíveis serão validadas e adicionadas automaticamente; o ZIP não será armazenado.';
+$string['invalidimage'] =
+    'O arquivo "{$a}" não é uma fotografia estática JPEG, PNG ou WebP válida.';
 $string['invalidtargetposition'] =
     'Informe uma posição entre {$a->minimum} e {$a->maximum}.';
 $string['invalidzip'] =
@@ -65,10 +83,16 @@ $string['managephotosnotice'] =
     'As fotografias removidas deste gerenciador serão excluídas da galeria depois que você salvar as alterações.';
 $string['managephotostitle'] =
     'Gerenciar fotos: {$a}';
+$string['metadataconflict'] =
+    'A galeria foi alterada enquanto esta página estava aberta. Suas alterações não foram salvas. Revise os valores atuais e tente novamente.';
 $string['metadataintro'] =
-    'Adicione uma legenda para identificar visualmente a fotografia e um texto alternativo para pessoas que utilizam leitores de tela.';
+    'Adicione uma legenda, um texto alternativo para pessoas que utilizam leitores de tela e defina a ordem de exibição. A imagem em destaque permanece sempre em primeiro lugar.';
+$string['metadatalockfailed'] =
+    'A galeria está sendo alterada por outra solicitação. Aguarde um momento e tente novamente.';
 $string['metadataupdated'] =
     'As legendas e os textos alternativos foram atualizados.';
+$string['metadatavaluetoolong'] =
+    'Este metadado não pode conter mais de {$a} caracteres.';
 $string['modulename'] = 'Galeria de fotos';
 $string['modulename_help'] =
     '<h4>Principais recursos</h4>
@@ -88,6 +112,8 @@ $string['movephotoup'] =
 $string['movetoposition'] =
     'Mover';
 $string['nextimage'] = 'Próxima fotografia';
+$string['noautocompletioninline'] =
+    'A conclusão baseada na visualização não pode ser usada porque esta atividade exibe as fotografias diretamente na página do curso.';
 $string['noimages'] = 'Nenhuma fotografia foi adicionada a esta galeria.';
 $string['nophotosmetadata'] =
     'A galeria ainda não possui fotografias para editar.';
@@ -117,31 +143,16 @@ $string['photosupdated'] =
     'As fotografias da galeria foram atualizadas.';
 $string['pluginadministration'] = 'Administração da galeria de fotos';
 $string['pluginname'] = 'Galeria de fotos';
-
-
-
-
-
-
-
 $string['previewcount'] = 'Fotos exibidas no mosaico';
 $string['previewcount_help'] =
     'Define quantas fotografias serão apresentadas diretamente na página do curso ou na página inicial. Todas as demais fotografias continuarão disponíveis na página completa da galeria.';
-
 $string['previewphotos'] = '{$a} fotografias';
-
-
-
-
 $string['previousimage'] = 'Fotografia anterior';
-
-
-
-
-
 $string['privacy:metadata'] =
     'A atividade Galeria de fotos armazena apenas as configurações, as fotografias e os metadados da galeria, sem associá-los a um usuário específico.';
 $string['remainingphotos'] = '+{$a}';
+$string['remainingphotosaccessible'] =
+    'Mais {$a} fotografias estão disponíveis neste visualizador.';
 $string['savemetadata'] =
     'Salvar legendas e acessibilidade';
 $string['savephotos'] =
@@ -150,13 +161,20 @@ $string['targetposition'] =
     'Nova posição';
 $string['targetposition_help'] =
     'Informe a posição em que a fotografia deve aparecer e clique em “Mover”. As demais fotografias serão reorganizadas automaticamente.';
+$string['taskgeneratepreviews'] = 'Gerar prévias da Galeria de fotos';
 $string['toomanyimages'] =
     'A galeria pode conter no máximo {$a} fotografias.';
 $string['totalphotos'] = '{$a} fotografias';
 $string['viewmorephotos'] = 'Ver mais fotos';
 $string['zipareatoolarge'] =
     'As fotografias importadas ultrapassariam o limite total de armazenamento da galeria de {$a}.';
+$string['zipcompressionratio'] =
+    'A entrada compactada "{$a}" possui uma taxa de compressão insegura.';
 $string['zipimagetoolarge'] =
     'A fotografia "{$a}" ultrapassa o limite permitido por arquivo.';
+$string['zipinvalidpath'] =
+    'A entrada "{$a}" do arquivo ZIP possui um caminho inválido ou inseguro.';
 $string['zipnoimages'] =
     'O arquivo ZIP não contém fotografias compatíveis.';
+$string['ziptoomanyentries'] =
+    'O arquivo ZIP contém mais de {$a} entradas.';

@@ -118,7 +118,7 @@ class restore_photogallery_activity_structure_step extends restore_activity_stru
      * Restores files and reconnects metadata to their new hashes.
      */
     protected function after_execute() {
-        global $CFG, $DB;
+        global $DB;
 
         /*
          * Restore the permanent file areas.
@@ -246,6 +246,9 @@ class restore_photogallery_activity_structure_step extends restore_activity_stru
                 'pathnamehash' =>
                     $pathnamehash,
 
+                'contenthash' =>
+                    $file->get_contenthash(),
+
                 'caption' => trim(
                     (string) (
                         $metadata->caption ?? ''
@@ -278,28 +281,13 @@ class restore_photogallery_activity_structure_step extends restore_activity_stru
         }
 
         /*
-         * Generated thumbnails are not included in the backup.
-         * Recreate the missing grid and mosaic previews now.
+         * Backups may contain legacy media that does not satisfy the current
+         * validation rules. Keep the restored files and metadata intact, then
+         * sanitise supported media asynchronously before it can be displayed.
+         * The sanitisation task queues previews only after a successful rewrite.
          */
-        require_once(
-            $CFG->dirroot .
-            '/mod/photogallery/lib.php'
-        );
-
-        $previewcount = (int) $DB->get_field(
-            'photogallery',
-            'previewcount',
-            [
-                'id' =>
-                    $this->newphotogalleryid,
-            ],
-            MUST_EXIST
-        );
-
-        photogallery_generate_missing_previews(
-            $this->newphotogalleryid,
-            $modulecontext,
-            $previewcount
+        \mod_photogallery\task\sanitize_existing_media::queue_gallery(
+            $this->newphotogalleryid
         );
     }
 }

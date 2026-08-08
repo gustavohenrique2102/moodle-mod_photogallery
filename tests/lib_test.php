@@ -25,26 +25,34 @@ namespace mod_photogallery;
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\Group('mod_photogallery')]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_photogallery\task\generate_previews::class)]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_add_instance')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_update_instance')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_delete_instance')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_supports')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_get_filemanager_options')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_get_cover_filemanager_options')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_get_zip_filepicker_options')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_prepare_image_drafts')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_get_file_areas')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_get_file_info')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_import_zip')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_cleanup_image_metadata')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_cm_info_view')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_queue_missing_previews')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_view')]
 final class lib_test extends \advanced_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6Y1sAAAAASUVORK5CYII=';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNgYGAAAAAEAAGjChXjAAAAAElFTkSuQmCC';
 
     /** A second valid 1x1 PNG image with different content. */
     private const PNG_TWO =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNg+M8AAAICAQAuFKzOAAAAAElFTkSuQmCC';
 
-    /** A valid 1x1 GIF image. */
-    private const GIF_ONE =
-        'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    /** A third valid 1x1 PNG image with different content. */
+    private const PNG_THREE =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWP4z8AAAAMBAQCc479ZAAAAAElFTkSuQmCC';
 
     public static function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
@@ -74,7 +82,7 @@ final class lib_test extends \advanced_testcase {
         ]);
 
         $coverdraftid = $this->create_draft_area([
-            'cover.gif' => $this->gif_one(),
+            'cover.png' => $this->png_three(),
         ]);
 
         $gallery = $this->getDataGenerator()->create_module(
@@ -107,14 +115,14 @@ final class lib_test extends \advanced_testcase {
 
         $this->assertCount(2, $images);
         $this->assertInstanceOf(\stored_file::class, $cover);
-        $this->assertSame('cover.gif', $cover->get_filename());
+        $this->assertSame('cover.png', $cover->get_filename());
 
         $displaynames = array_map(
             static fn(\stored_file $file): string => $file->get_filename(),
             photogallery_get_display_images($context, (int) $gallery->id)
         );
 
-        $this->assertSame('cover.gif', $displaynames[0]);
+        $this->assertSame('cover.png', $displaynames[0]);
         $this->assertContains('photo-a.png', $displaynames);
         $this->assertContains('photo-b.png', $displaynames);
     }
@@ -206,10 +214,10 @@ final class lib_test extends \advanced_testcase {
                 'filearea' => 'draft',
                 'itemid' => $preparedraftid,
                 'filepath' => '/',
-                'filename' => 'photo-c.gif',
+                'filename' => 'photo-c.png',
                 'userid' => $USER->id,
             ],
-            $this->gif_one()
+            $this->png_one()
         );
 
         $updated = (object) [
@@ -243,7 +251,7 @@ final class lib_test extends \advanced_testcase {
 
         $this->assertArrayNotHasKey('photo-a.png', $remainingfiles);
         $this->assertArrayHasKey('photo-b.png', $remainingfiles);
-        $this->assertArrayHasKey('photo-c.gif', $remainingfiles);
+        $this->assertArrayHasKey('photo-c.png', $remainingfiles);
 
         $this->assertFalse(
             $DB->record_exists(
@@ -253,6 +261,88 @@ final class lib_test extends \advanced_testcase {
                     'pathnamehash' => $filesbyname['photo-a.png']->get_pathnamehash(),
                 ]
             )
+        );
+    }
+
+    /**
+     * Tests that an invalid ZIP cannot partially update a gallery.
+     */
+    public function test_update_validates_zip_before_persistent_changes(): void {
+        global $DB, $USER;
+
+        $course = $this->getDataGenerator()->create_course();
+        $imagesdraftid = $this->create_draft_area([
+            'photo-a.png' => $this->png_one(),
+            'photo-b.png' => $this->png_two(),
+        ]);
+        $gallery = $this->getDataGenerator()->create_module(
+            'photogallery',
+            [
+                'course' => $course->id,
+                'name' => 'Original gallery',
+                'images' => $imagesdraftid,
+            ]
+        );
+        $context = \core\context\module::instance($gallery->cmid);
+
+        $preparedraftid = 0;
+        file_prepare_draft_area(
+            $preparedraftid,
+            $context->id,
+            'mod_photogallery',
+            'images',
+            0,
+            photogallery_get_filemanager_options($course)
+        );
+        $draftfiles = get_file_storage()->get_area_files(
+            \core\context\user::instance($USER->id)->id,
+            'user',
+            'draft',
+            $preparedraftid,
+            'id ASC',
+            false
+        );
+        $draftfiles = $this->index_files_by_name($draftfiles);
+        $draftfiles['photo-a.png']->delete();
+
+        $zipdraftid = $this->create_zip_draft([
+            'invalid.png' => 'This is not an image.',
+        ]);
+        $updated = (object) [
+            'instance' => $gallery->id,
+            'coursemodule' => $gallery->cmid,
+            'course' => $course->id,
+            'name' => 'Must not persist',
+            'intro' => '',
+            'introformat' => FORMAT_HTML,
+            'previewcount' => 9,
+            'images' => $preparedraftid,
+            'coverimage' => 0,
+            'importzip' => $zipdraftid,
+        ];
+
+        $this->assert_moodle_exception_errorcode(
+            static function () use ($updated): void {
+                photogallery_update_instance($updated);
+            },
+            'invalidzipimage'
+        );
+
+        $record = $DB->get_record(
+            'photogallery',
+            ['id' => $gallery->id],
+            '*',
+            MUST_EXIST
+        );
+        $this->assertSame('Original gallery', $record->name);
+        $this->assertSame(6, (int) $record->previewcount);
+
+        $files = $this->index_files_by_name(
+            photogallery_get_images($context)
+        );
+        $this->assertSame(
+            ['photo-a.png', 'photo-b.png'],
+            array_keys($files)
         );
     }
 
@@ -267,7 +357,7 @@ final class lib_test extends \advanced_testcase {
             'photo.png' => $this->png_one(),
         ]);
         $coverdraftid = $this->create_draft_area([
-            'cover.gif' => $this->gif_one(),
+            'cover.png' => $this->png_one(),
         ]);
 
         $gallery = $this->getDataGenerator()->create_module(
@@ -341,7 +431,218 @@ final class lib_test extends \advanced_testcase {
         $this->assertSame(200 * 1024 * 1024, $options['areamaxbytes']);
         $this->assertGreaterThan(0, $options['maxbytes']);
         $this->assertLessThanOrEqual(10 * 1024 * 1024, $options['maxbytes']);
-        $this->assertSame(['web_image'], $options['accepted_types']);
+        $this->assertSame(
+            ['.jpg', '.jpeg', '.png', '.webp'],
+            $options['accepted_types']
+        );
+
+        $coveroptions = photogallery_get_cover_filemanager_options($course);
+        $this->assertSame(
+            ['.jpg', '.jpeg', '.png', '.webp'],
+            $coveroptions['accepted_types']
+        );
+    }
+
+    /**
+     * Tests strict feature values used by Moodle's resource overview.
+     */
+    public function test_supports_returns_resource_archetype_as_integer(): void {
+        $this->assertIsInt(MOD_ARCHETYPE_RESOURCE);
+        $this->assertSame(
+            MOD_ARCHETYPE_RESOURCE,
+            photogallery_supports(FEATURE_MOD_ARCHETYPE)
+        );
+    }
+
+    /**
+     * Tests read-only integration with Moodle's file browser.
+     */
+    public function test_file_browser_exposes_source_areas_read_only(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $imagesdraftid = $this->create_draft_area([
+            'photo.png' => $this->png_one(),
+        ]);
+        $gallery = $this->getDataGenerator()->create_module(
+            'photogallery',
+            [
+                'course' => $course->id,
+                'images' => $imagesdraftid,
+            ]
+        );
+
+        $cm = get_coursemodule_from_instance(
+            'photogallery',
+            $gallery->id,
+            $course->id,
+            false,
+            MUST_EXIST
+        );
+        $context = \core\context\module::instance($cm->id);
+        $areas = photogallery_get_file_areas($course, $cm, $context);
+
+        $this->assertSame(
+            ['images', 'cover'],
+            array_keys($areas)
+        );
+
+        $rootinfo = photogallery_get_file_info(
+            get_file_browser(),
+            $areas,
+            $course,
+            $cm,
+            $context,
+            'images',
+            0,
+            null,
+            null
+        );
+
+        $this->assertInstanceOf(\file_info::class, $rootinfo);
+        $this->assertTrue($rootinfo->is_directory());
+        $this->assertNull($rootinfo->get_url());
+        $this->assertCount(1, $rootinfo->get_children());
+
+        $fileinfo = photogallery_get_file_info(
+            get_file_browser(),
+            $areas,
+            $course,
+            $cm,
+            $context,
+            'images',
+            0,
+            '/',
+            'photo.png'
+        );
+
+        $this->assertInstanceOf(\file_info::class, $fileinfo);
+        $this->assertTrue($fileinfo->is_readable());
+        $this->assertFalse($fileinfo->is_writable());
+        $this->assertStringContainsString(
+            '/mod_photogallery/images/0/photo.png',
+            $fileinfo->get_url()
+        );
+
+        $this->assertNull(
+            photogallery_get_file_info(
+                get_file_browser(),
+                $areas,
+                $course,
+                $cm,
+                $context,
+                'thumbs',
+                0,
+                '/',
+                'photo.png'
+            )
+        );
+    }
+
+    /**
+     * Tests lifecycle synchronisation of expected-completion events.
+     */
+    public function test_instance_lifecycle_synchronises_completion_event(): void {
+        global $CFG, $DB;
+
+        $CFG->enablecompletion = true;
+        $course = $this->getDataGenerator()->create_course([
+            'enablecompletion' => true,
+        ]);
+        $firstexpected = time() + DAYSECS;
+        $gallery = $this->getDataGenerator()->create_module(
+            'photogallery',
+            ['course' => $course->id],
+            [
+                'completion' => COMPLETION_TRACKING_AUTOMATIC,
+                'completionview' => COMPLETION_VIEW_REQUIRED,
+                'completionexpected' => $firstexpected,
+            ]
+        );
+
+        $eventparams = [
+            'modulename' => 'photogallery',
+            'instance' => $gallery->id,
+            'eventtype' =>
+                \core_completion\api::COMPLETION_EVENT_TYPE_DATE_COMPLETION_EXPECTED,
+        ];
+        $event = $DB->get_record('event', $eventparams, '*', MUST_EXIST);
+        $this->assertSame($firstexpected, (int) $event->timestart);
+
+        $secondexpected = $firstexpected + DAYSECS;
+        $updated = (object) [
+            'instance' => $gallery->id,
+            'coursemodule' => $gallery->cmid,
+            'course' => $course->id,
+            'name' => $gallery->name,
+            'intro' => $gallery->intro,
+            'introformat' => $gallery->introformat,
+            'previewcount' => $gallery->previewcount,
+            'images' => 0,
+            'coverimage' => 0,
+            'importzip' => 0,
+            'completionexpected' => $secondexpected,
+        ];
+
+        $this->assertTrue(photogallery_update_instance($updated));
+        $event = $DB->get_record('event', $eventparams, '*', MUST_EXIST);
+        $this->assertSame($secondexpected, (int) $event->timestart);
+
+        $this->assertTrue(
+            photogallery_delete_instance((int) $gallery->id)
+        );
+        $this->assertFalse($DB->record_exists('event', $eventparams));
+    }
+
+    /**
+     * Tests that previews are generated only by the queued adhoc task.
+     */
+    public function test_preview_generation_is_queued(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $imagesdraftid = $this->create_draft_area([
+            'photo.png' => $this->png_one(),
+        ]);
+        $gallery = $this->getDataGenerator()->create_module(
+            'photogallery',
+            [
+                'course' => $course->id,
+                'images' => $imagesdraftid,
+            ]
+        );
+        $context = \core\context\module::instance($gallery->cmid);
+        $image = reset(photogallery_get_images($context));
+
+        $this->assertInstanceOf(\stored_file::class, $image);
+        $this->assertCount(
+            0,
+            get_file_storage()->get_area_files(
+                $context->id,
+                'mod_photogallery',
+                'thumbs',
+                0,
+                'id ASC',
+                false
+            )
+        );
+
+        $tasks = \core\task\manager::get_adhoc_tasks(
+            \mod_photogallery\task\generate_previews::class
+        );
+        $this->assertCount(1, $tasks);
+
+        $tasks[0]->execute();
+
+        $thumbs = get_file_storage()->get_area_files(
+            $context->id,
+            'mod_photogallery',
+            'thumbs',
+            0,
+            'id ASC',
+            false
+        );
+        $this->assertCount(2, $thumbs);
+        $this->assertInstanceOf(
+            \stored_file::class,
+            photogallery_get_resized_preview($image, $context, 'grid')
+        );
     }
 
     /**
@@ -630,6 +931,7 @@ final class lib_test extends \advanced_testcase {
         $record = (object) [
             'photogalleryid' => $galleryid,
             'pathnamehash' => $file->get_pathnamehash(),
+            'contenthash' => $file->get_contenthash(),
             'caption' => $caption,
             'alttext' => $alttext,
             'sortorder' => $sortorder,
@@ -700,14 +1002,13 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
-     * Returns the valid GIF fixture.
+     * Returns the third valid PNG fixture.
      *
      * @return string
      */
-    private function gif_one(): string {
-        return base64_decode(self::GIF_ONE, true);
+    private function png_three(): string {
+        return base64_decode(self::PNG_THREE, true);
     }
-
 
     /**
      * Tests the gallery viewed event and completion by view.

@@ -44,6 +44,7 @@ class metadata extends \moodleform {
 
         $images = $this->_customdata['images'] ?? [];
         $records = $this->_customdata['records'] ?? [];
+        $revision = $this->_customdata['revision'] ?? '';
 
         $imagecount = count($images);
 
@@ -52,7 +53,11 @@ class metadata extends \moodleform {
             && $images[0]->get_filearea() === 'cover'
         );
 
-        $firstmovableindex = $hascover ? 1 : 0;
+        $previews = \mod_photogallery\local\thumbnail_manager::queue_missing_for_mode(
+            $images,
+            $this->_customdata['context'],
+            'grid'
+        );
 
         $mform->addElement(
             'static',
@@ -66,12 +71,7 @@ class metadata extends \moodleform {
             $pathnamehash = $file->get_pathnamehash();
             $record = $records[$pathnamehash] ?? null;
 
-            $previewfile =
-                \photogallery_get_resized_preview(
-                    $file,
-                    $this->_customdata['context'],
-                    'grid'
-                );
+            $previewfile = $previews[$file->get_contenthash()] ?? null;
 
             $thumbnailfile = $previewfile ?? $file;
 
@@ -225,7 +225,8 @@ class metadata extends \moodleform {
                 ),
                 [
                     'size' => 80,
-                    'maxlength' => 500,
+                    'maxlength' =>
+                        \mod_photogallery\local\metadata_manager::CAPTION_MAX_LENGTH,
                 ]
             );
 
@@ -255,6 +256,8 @@ class metadata extends \moodleform {
                 [
                     'rows' => 3,
                     'cols' => 80,
+                    'maxlength' =>
+                        \mod_photogallery\local\metadata_manager::ALTTEXT_MAX_LENGTH,
                 ]
             );
 
@@ -285,6 +288,17 @@ class metadata extends \moodleform {
             PARAM_INT
         );
 
+        $mform->addElement(
+            'hidden',
+            'revision',
+            $revision
+        );
+
+        $mform->setType(
+            'revision',
+            PARAM_ALPHANUM
+        );
+
         $this->add_action_buttons(
             true,
             get_string(
@@ -295,7 +309,7 @@ class metadata extends \moodleform {
     }
 
     /**
-     * Validates photograph position changes.
+     * Validates metadata lengths and photograph position changes.
      *
      * @param array $data Submitted form data.
      * @param array $files Submitted files.
@@ -306,6 +320,33 @@ class metadata extends \moodleform {
 
         $images = $this->_customdata['images'] ?? [];
         $imagecount = count($images);
+
+        foreach ($images as $index => $file) {
+            $caption = trim((string) ($data['caption_' . $index] ?? ''));
+            $alttext = trim((string) ($data['alttext_' . $index] ?? ''));
+
+            if (
+                \core_text::strlen($caption)
+                > \mod_photogallery\local\metadata_manager::CAPTION_MAX_LENGTH
+            ) {
+                $errors['caption_' . $index] = get_string(
+                    'maximumchars',
+                    '',
+                    \mod_photogallery\local\metadata_manager::CAPTION_MAX_LENGTH
+                );
+            }
+
+            if (
+                \core_text::strlen($alttext)
+                > \mod_photogallery\local\metadata_manager::ALTTEXT_MAX_LENGTH
+            ) {
+                $errors['alttext_' . $index] = get_string(
+                    'maximumchars',
+                    '',
+                    \mod_photogallery\local\metadata_manager::ALTTEXT_MAX_LENGTH
+                );
+            }
+        }
 
         if ($imagecount === 0) {
             return $errors;

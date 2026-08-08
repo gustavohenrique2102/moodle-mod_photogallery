@@ -82,6 +82,15 @@ class backup_photogallery_activity_task extends backup_activity_task {
             $content
         );
 
+        $search =
+            "/({$base}\/mod\/photogallery\/index\.php\?id=)([0-9]+)/";
+
+        $content = preg_replace(
+            $search,
+            '$@PHOTOGALLERYINDEX*$2@$',
+            $content
+        );
+
         return $content;
     }
 }

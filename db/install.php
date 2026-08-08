@@ -15,21 +15,20 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Activity index for the Photo gallery activity.
+ * Photo gallery post-installation steps.
  *
  * @package   mod_photogallery
  * @copyright 2026 Gustavo Soares
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once(__DIR__ . '/../../config.php');
-
-$courseid = required_param('id', PARAM_INT);
-$course = get_course($courseid);
-
-require_course_login($course);
-
-\core_courseformat\activityoverviewbase::redirect_to_overview_page(
-    $courseid,
-    'resource'
-);
+/**
+ * Marks clean installations as using the current media privacy format.
+ */
+function xmldb_photogallery_install(): void {
+    set_config(
+        'mediasanitizedversion',
+        \mod_photogallery\task\sanitize_existing_media::MIGRATION_VERSION,
+        'mod_photogallery'
+    );
+}

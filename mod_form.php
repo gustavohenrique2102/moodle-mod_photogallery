@@ -191,6 +191,146 @@ class mod_photogallery_mod_form extends moodleform_mod {
     }
 
     /**
+     * Validates submitted settings and draft media on the server.
+     *
+     * @param array $data Submitted values.
+     * @param array $files Submitted files.
+     * @return array Field errors.
+     */
+    public function validation($data, $files): array {
+        $errors = parent::validation($data, $files);
+
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            $errors['name'] = get_string('required');
+        } else if (\core_text::strlen($name) > 255) {
+            $errors['name'] = get_string('maximumchars', '', 255);
+        }
+
+        $imagesdraftid = (int) ($data['images'] ?? 0);
+        $coverdraftid = (int) ($data['coverimage'] ?? 0);
+        $zipdraftid = (int) ($data['importzip'] ?? 0);
+        $galleryoptions = photogallery_get_filemanager_options($this->_course);
+
+        $imagestats = $this->validate_image_draft(
+            'images',
+            $imagesdraftid,
+            $galleryoptions,
+            $errors
+        );
+        $coverstats = $this->validate_image_draft(
+            'coverimage',
+            $coverdraftid,
+            photogallery_get_cover_filemanager_options($this->_course),
+            $errors
+        );
+
+        [$imagecount, $imagebytes] = $this->get_draft_totals($imagesdraftid);
+        [$covercount, $coverbytes] = $this->get_draft_totals($coverdraftid);
+        $totalcount = $imagecount + $covercount;
+        $totalbytes = $imagebytes + $coverbytes;
+        $totalpixels = $imagestats['pixels'] + $coverstats['pixels'];
+
+        $maxfiles = (int) ($galleryoptions['maxfiles'] ?? 0);
+        $areamaxbytes = (int) ($galleryoptions['areamaxbytes'] ?? 0);
+
+        if ($maxfiles > 0 && $totalcount > $maxfiles) {
+            $errors['images'] = get_string('toomanyimages', 'mod_photogallery', $maxfiles);
+        }
+        if ($areamaxbytes > 0 && $totalbytes > $areamaxbytes) {
+            $errors['images'] = get_string(
+                'galleryareatoolarge',
+                'mod_photogallery',
+                display_size($areamaxbytes)
+            );
+        }
+        if ($totalpixels > \mod_photogallery\local\image_validator::MAX_TOTAL_PIXELS) {
+            $errors['images'] = get_string(
+                'imagetotalpixelstoolarge',
+                'mod_photogallery',
+                (int) (\mod_photogallery\local\image_validator::MAX_TOTAL_PIXELS / 1000000)
+            );
+        }
+
+        if ($zipdraftid > 0) {
+            try {
+                \mod_photogallery\local\zip_importer::validate(
+                    $zipdraftid,
+                    $this->_course,
+                    $totalcount,
+                    $totalbytes,
+                    $totalpixels
+                );
+            } catch (\moodle_exception $exception) {
+                $errors['importzip'] = $exception->getMessage();
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Maps media validation exceptions to the relevant form field.
+     *
+     * @param string $field Form field name.
+     * @param int $draftitemid Draft item ID.
+     * @param array $options Filemanager options.
+     * @param array $errors Current validation errors.
+     * @return array{count: int, bytes: int, pixels: int} Validated draft statistics.
+     */
+    private function validate_image_draft(
+        string $field,
+        int $draftitemid,
+        array $options,
+        array &$errors
+    ): array {
+        try {
+            return \mod_photogallery\local\image_validator::get_draft_stats(
+                $draftitemid,
+                $options
+            );
+        } catch (\moodle_exception $exception) {
+            $errors[$field] = $exception->getMessage();
+            return [
+                'count' => 0,
+                'bytes' => 0,
+                'pixels' => 0,
+            ];
+        }
+    }
+
+    /**
+     * Counts files and bytes in a user draft area.
+     *
+     * @param int $draftitemid Draft item ID.
+     * @return int[] File count and total bytes.
+     */
+    private function get_draft_totals(int $draftitemid): array {
+        global $USER;
+
+        if ($draftitemid <= 0) {
+            return [0, 0];
+        }
+
+        $usercontext = \core\context\user::instance($USER->id, MUST_EXIST);
+        $draftfiles = get_file_storage()->get_area_files(
+            $usercontext->id,
+            'user',
+            'draft',
+            $draftitemid,
+            'id ASC',
+            false
+        );
+
+        $totalbytes = array_sum(array_map(
+            static fn(stored_file $file): int => $file->get_filesize(),
+            $draftfiles
+        ));
+
+        return [count($draftfiles), $totalbytes];
+    }
+
+    /**
      * Prepares existing gallery images for the file manager.
      *
      * @param array $defaultvalues Existing activity values.

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="mod/photogallery/db"
-       VERSION="2026072700"
+       VERSION="2026080700"
        COMMENT="XMLDB file for Moodle mod_photogallery"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
@@ -8,7 +8,6 @@
     <TABLES>
 
         <TABLE NAME="photogallery"
-               NEXT="photogallery_image"
                COMMENT="Stores the configuration of each photo gallery activity">
 
             <FIELDS>
@@ -83,8 +82,7 @@
 
         </TABLE>
         <TABLE NAME="photogallery_image"
-              COMMENT="Stores captions and alternative text for gallery images"
-              PREVIOUS="photogallery">
+              COMMENT="Stores captions and alternative text for gallery images">
 
               <FIELDS>
                      <FIELD NAME="id"
@@ -100,6 +98,12 @@
                             SEQUENCE="false"/>
 
                      <FIELD NAME="pathnamehash"
+                            TYPE="char"
+                            LENGTH="40"
+                            NOTNULL="true"
+                            SEQUENCE="false"/>
+
+                     <FIELD NAME="contenthash"
                             TYPE="char"
                             LENGTH="40"
                             NOTNULL="true"

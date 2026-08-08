@@ -28,333 +28,82 @@ require_once(__DIR__ . '/lib.php');
 global $DB, $OUTPUT, $PAGE;
 
 $id = required_param('id', PARAM_INT);
+$cm = get_coursemodule_from_id('photogallery', $id, 0, false, MUST_EXIST);
+$course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+$photogallery = $DB->get_record('photogallery', ['id' => $cm->instance], '*', MUST_EXIST);
 
-$cm = get_coursemodule_from_id(
-    'photogallery',
-    $id,
-    0,
-    false,
-    MUST_EXIST
-);
+require_course_login($course, true, $cm);
 
-$course = $DB->get_record(
-    'course',
-    ['id' => $cm->course],
-    '*',
-    MUST_EXIST
-);
+$modulecontext = \core\context\module::instance($cm->id, MUST_EXIST);
+require_capability('mod/photogallery:manage', $modulecontext);
 
-$photogallery = $DB->get_record(
-    'photogallery',
-    ['id' => $cm->instance],
-    '*',
-    MUST_EXIST
-);
-
-require_course_login(
-    $course,
-    true,
-    $cm
-);
-
-/** @var \core\context\module $modulecontext */
-$modulecontext = \core\context\module::instance(
-    $cm->id,
-    MUST_EXIST
-);
-
-if ($modulecontext === false) {
-    throw new \core\exception\coding_exception(
-        'Could not obtain the photo gallery context.'
-    );
-}
-
-/** @var \context $capabilitycontext */
-$capabilitycontext = $modulecontext;
-
-require_capability(
-    'mod/photogallery:manage',
-    $capabilitycontext
-);
-
-$editurl = new moodle_url(
-    '/mod/photogallery/editmetadata.php',
-    ['id' => $cm->id]
-);
-
-$viewurl = new moodle_url(
-    '/mod/photogallery/view.php',
-    ['id' => $cm->id]
-);
+$editurl = new moodle_url('/mod/photogallery/editmetadata.php', ['id' => $cm->id]);
+$viewurl = new moodle_url('/mod/photogallery/view.php', ['id' => $cm->id]);
 
 $PAGE->set_url($editurl);
-$PAGE->set_cm(
-    $cm,
-    $course,
-    $photogallery
-);
-
+$PAGE->set_cm($cm, $course, $photogallery);
 $PAGE->set_context($modulecontext);
 $PAGE->set_pagelayout('incourse');
 
-$galleryname = format_string(
-    $photogallery->name,
-    true,
-    ['context' => $modulecontext]
-);
-
-$PAGE->set_title(
-    get_string(
-        'editmetadatatitle',
-        'mod_photogallery',
-        $galleryname
-    )
-);
-
+$galleryname = format_string($photogallery->name, true, ['context' => $modulecontext]);
+$PAGE->set_title(get_string('editmetadatatitle', 'mod_photogallery', $galleryname));
 $PAGE->set_heading($course->fullname);
 
-$images = array_values(
-    photogallery_get_display_images(
-        $modulecontext,
-        (int) $photogallery->id
-    )
+// Reconcile renames and replacements before rendering editable values.
+\mod_photogallery\local\metadata_manager::reconcile_files(
+    (int) $photogallery->id,
+    $modulecontext,
+    true
 );
 
-$metadatarecords = $DB->get_records(
-    'photogallery_image',
-    [
-        'photogalleryid' => $photogallery->id,
-    ]
+$recordsbyhash = \mod_photogallery\local\metadata_manager::get_by_pathnamehash((int) $photogallery->id);
+$images = array_values(photogallery_get_display_images(
+    $modulecontext,
+    (int) $photogallery->id,
+    $recordsbyhash
+));
+$revision = \mod_photogallery\local\metadata_manager::get_revision(
+    (int) $photogallery->id,
+    $modulecontext
 );
 
-$recordsbyhash = [];
-
-foreach ($metadatarecords as $record) {
-    $recordsbyhash[$record->pathnamehash] = $record;
-}
-
-$mform = new \mod_photogallery\form\metadata(
-    null,
-    [
-        'images' => $images,
-        'records' => $recordsbyhash,
-        'context' => $modulecontext,
-    ]
-);
+$mform = new \mod_photogallery\form\metadata(null, [
+    'images' => $images,
+    'records' => $recordsbyhash,
+    'context' => $modulecontext,
+    'revision' => $revision,
+]);
 
 if ($mform->is_cancelled()) {
     redirect($viewurl);
 }
 
 if ($data = $mform->get_data()) {
-    $moveindex = null;
-    $targetposition = null;
-
-    /*
-    * Identifica qual botão "Mover" foi pressionado.
-    */
-    foreach ($images as $index => $file) {
-        if (!empty($data->{'moveto_' . $index})) {
-            $moveindex = $index;
-
-            /*
-            * A posição informada pelo usuário começa em 1.
-            */
-            $targetposition = (int) (
-                $data->{'targetposition_' . $index} ?? 0
+    try {
+        $orderchanged = \mod_photogallery\local\metadata_manager::save(
+            (int) $photogallery->id,
+            $modulecontext,
+            $images,
+            $data,
+            (string) $data->revision
+        );
+    } catch (\moodle_exception $exception) {
+        if (in_array($exception->errorcode, ['metadataconflict', 'metadatalockfailed'], true)) {
+            redirect(
+                $editurl,
+                $exception->getMessage(),
+                null,
+                \core\output\notification::NOTIFY_ERROR
             );
-
-            break;
         }
+        throw $exception;
     }
-
-    $imagecount = count($images);
-
-    $hascover = (
-        $imagecount > 0
-        && $images[0]->get_filearea() === 'cover'
-    );
-
-    $firstmovableindex = $hascover ? 1 : 0;
-
-    $transaction = $DB->start_delegated_transaction();
-
-    $savedrecords = [];
-    $now = time();
-
-    foreach ($images as $index => $file) {
-        $pathnamehash = (string) (
-            $data->{'pathnamehash_' . $index} ?? ''
-        );
-
-        /*
-         * Prevents a submitted identifier from being used
-         * for another photograph.
-         */
-        if (
-            $pathnamehash
-            !== $file->get_pathnamehash()
-        ) {
-            throw new
-                \core\exception\invalid_parameter_exception(
-                    'Invalid photograph identifier.'
-                );
-        }
-
-
-        $caption = trim(
-            (string) (
-                $data->{'caption_' . $index} ?? ''
-            )
-        );
-
-        $alttext = trim(
-            (string) (
-                $data->{'alttext_' . $index} ?? ''
-            )
-        );
-
-        $existing =
-            $recordsbyhash[$pathnamehash] ?? null;
-
-        if ($existing) {
-            $existing->caption = $caption;
-            $existing->alttext = $alttext;
-            $existing->sortorder = $index;
-            $existing->timemodified = $now;
-
-            $DB->update_record(
-                'photogallery_image',
-                $existing
-            );
-
-            $savedrecords[$pathnamehash] =
-                $existing;
-        } else {
-            $record = (object) [
-                'photogalleryid' =>
-                    $photogallery->id,
-                'pathnamehash' =>
-                    $pathnamehash,
-                'caption' => $caption,
-                'alttext' => $alttext,
-                'sortorder' => $index,
-                'timecreated' => $now,
-                'timemodified' => $now,
-            ];
-
-            $record->id = $DB->insert_record(
-                'photogallery_image',
-                $record,
-                true
-            );
-
-            $savedrecords[$pathnamehash] =
-                $record;
-        }
-    }
-
-    /*
-     * Changes the order after all current form values
-     * have been saved.
-     */
-    $orderchanged = false;
-
-    if (
-        $moveindex !== null
-        && $targetposition !== null
-    ) {
-        /*
-        * Converte a posição exibida ao usuário para índice PHP.
-        *
-        * Posição 1 = índice 0
-        * Posição 2 = índice 1
-        */
-        $targetindex = $targetposition - 1;
-
-        $validmove = (
-            $moveindex >= $firstmovableindex
-            && $moveindex < $imagecount
-            && $targetindex >= $firstmovableindex
-            && $targetindex < $imagecount
-        );
-
-        if (
-            $validmove
-            && $targetindex !== $moveindex
-        ) {
-            /*
-            * Monta a ordem atual por pathnamehash.
-            */
-            $orderedhashes = [];
-
-            foreach ($images as $image) {
-                $orderedhashes[] =
-                    $image->get_pathnamehash();
-            }
-
-            /*
-            * Retira a fotografia da posição atual.
-            */
-            $removeditems = array_splice(
-                $orderedhashes,
-                $moveindex,
-                1
-            );
-
-            $movedhash = reset($removeditems);
-
-            if (is_string($movedhash)) {
-                /*
-                * Insere diretamente na posição solicitada.
-                */
-                array_splice(
-                    $orderedhashes,
-                    $targetindex,
-                    0,
-                    [$movedhash]
-                );
-
-                /*
-                * Normaliza todas as posições para impedir
-                * números repetidos ou espaços na sequência.
-                */
-                foreach ($orderedhashes as $newindex => $pathnamehash) {
-                    $record =
-                        $savedrecords[$pathnamehash]
-                        ?? null;
-
-                    if (!$record) {
-                        continue;
-                    }
-
-                    $DB->set_field(
-                        'photogallery_image',
-                        'sortorder',
-                        $newindex,
-                        ['id' => $record->id]
-                    );
-                }
-
-                $orderchanged = true;
-            }
-        }
-    }
-
-    $transaction->allow_commit();
 
     if ($orderchanged) {
-        rebuild_course_cache(
-            $course->id,
-            true
-        );
-
+        rebuild_course_cache($course->id, true);
         redirect(
             $editurl,
-            get_string(
-                'photoorderupdated',
-                'mod_photogallery'
-            ),
+            get_string('photoorderupdated', 'mod_photogallery'),
             null,
             \core\output\notification::NOTIFY_SUCCESS
         );
@@ -362,36 +111,25 @@ if ($data = $mform->get_data()) {
 
     redirect(
         $viewurl,
-        get_string(
-            'metadataupdated',
-            'mod_photogallery'
-        ),
+        get_string('metadataupdated', 'mod_photogallery'),
         null,
         \core\output\notification::NOTIFY_SUCCESS
     );
 }
 
-$mform->set_data(
-    (object) [
+if (!$mform->is_submitted()) {
+    $mform->set_data((object) [
         'id' => $cm->id,
-    ]
-);
+        'revision' => $revision,
+    ]);
+}
 
 echo $OUTPUT->header();
-
-echo $OUTPUT->heading(
-    get_string(
-        'editmetadata',
-        'mod_photogallery'
-    )
-);
+echo $OUTPUT->heading(get_string('editmetadata', 'mod_photogallery'));
 
 if (empty($images)) {
     echo $OUTPUT->notification(
-        get_string(
-            'nophotosmetadata',
-            'mod_photogallery'
-        ),
+        get_string('nophotosmetadata', 'mod_photogallery'),
         \core\output\notification::NOTIFY_INFO
     );
 } else {

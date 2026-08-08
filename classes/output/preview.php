@@ -44,6 +44,13 @@ class preview implements renderable, templatable {
     private readonly array $files;
 
     /**
+     * All gallery files, including entries hidden from the course mosaic.
+     *
+     * @var stored_file[]
+     */
+    private readonly array $allfiles;
+
+    /**
      * Activity module context.
      *
      * @var context_module
@@ -95,6 +102,7 @@ class preview implements renderable, templatable {
      * @param int $totalimages Total number of images.
      * @param array $metadata Image metadata.
      * @param string $intro Activity introduction.
+     * @param stored_file[] $allfiles All files available to the lightbox.
      */
     public function __construct(
         array $files,
@@ -103,9 +111,11 @@ class preview implements renderable, templatable {
         moodle_url $galleryurl,
         int $totalimages,
         array $metadata = [],
-        string $intro = ''
+        string $intro = '',
+        array $allfiles = []
     ) {
         $this->files = $files;
+        $this->allfiles = $allfiles ?: $files;
         $this->context = $context;
         $this->galleryname = $galleryname;
         $this->galleryurl = $galleryurl;
@@ -123,11 +133,14 @@ class preview implements renderable, templatable {
     public function export_for_template(renderer_base $output) {
         $data = new stdClass();
 
-        $formattedname = format_string(
+        $formattedname = strip_tags(format_string(
             $this->galleryname,
             true,
-            ['context' => $this->context]
-        );
+            [
+                'context' => $this->context,
+                'escape' => false,
+            ]
+        ));
 
         $visiblecount = count($this->files);
         $remainingcount = max(
@@ -137,6 +150,7 @@ class preview implements renderable, templatable {
 
         $data->hasimages = $visiblecount > 0;
         $data->images = [];
+        $data->hiddenimages = [];
         $data->intro = $this->intro;
         $data->hasintro = trim($this->intro) !== '';
 
@@ -157,6 +171,12 @@ class preview implements renderable, templatable {
             'mod_photogallery'
         );
 
+        $previews = \mod_photogallery\local\thumbnail_manager::queue_missing_for_mode(
+            $this->files,
+            $this->context,
+            'mosaic'
+        );
+
         foreach ($this->files as $position => $file) {
             $number = $position + 1;
 
@@ -175,12 +195,7 @@ class preview implements renderable, templatable {
                 $file->get_timemodified()
             );
 
-            $previewfile =
-                \photogallery_get_resized_preview(
-                    $file,
-                    $this->context,
-                    'mosaic'
-                );
+            $previewfile = $previews[$file->get_contenthash()] ?? null;
 
             $thumbnailfile = $previewfile ?? $file;
 
@@ -239,6 +254,48 @@ class preview implements renderable, templatable {
                         $remainingcount
                     )
                     : '',
+                'remainingaccessiblelabel' => $islast && $remainingcount > 0
+                    ? get_string(
+                        'remainingphotosaccessible',
+                        'mod_photogallery',
+                        $remainingcount
+                    )
+                    : '',
+            ];
+        }
+
+        $hiddenfiles = array_slice($this->allfiles, $visiblecount);
+
+        foreach ($hiddenfiles as $offset => $file) {
+            $number = $visiblecount + $offset + 1;
+            $originalurl = moodle_url::make_pluginfile_url(
+                $file->get_contextid(),
+                $file->get_component(),
+                $file->get_filearea(),
+                $file->get_itemid(),
+                $file->get_filepath(),
+                $file->get_filename(),
+                false
+            );
+            $originalurl->param('oid', $file->get_timemodified());
+
+            $record = $this->metadata[$file->get_pathnamehash()] ?? null;
+            $caption = trim((string) ($record->caption ?? ''));
+            $alttext = trim((string) ($record->alttext ?? ''));
+            $fallbackalt = get_string(
+                'imagealt',
+                'mod_photogallery',
+                (object) [
+                    'number' => $number,
+                    'gallery' => $formattedname,
+                ]
+            );
+
+            $data->hiddenimages[] = (object) [
+                'url' => $originalurl->out(false),
+                'filename' => $file->get_filename(),
+                'alt' => $alttext ?: $fallbackalt,
+                'caption' => $caption,
             ];
         }
 
