@@ -623,9 +623,9 @@ final class lib_test extends \advanced_testcase {
             )
         );
 
-        $tasks = \core\task\manager::get_adhoc_tasks(
+        $tasks = array_values(\core\task\manager::get_adhoc_tasks(
             \mod_photogallery\task\generate_previews::class
-        );
+        ));
         $this->assertCount(2, $tasks);
 
         $tasks[0]->execute();
