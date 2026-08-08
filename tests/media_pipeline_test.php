@@ -28,6 +28,9 @@ use mod_photogallery\local\zip_importer;
  * @category  test
  * @copyright 2026 Gustavo Soares
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \mod_photogallery\local\image_validator
+ * @covers \mod_photogallery\local\zip_importer
+ * @covers \mod_photogallery\local\thumbnail_manager
  */
 #[\PHPUnit\Framework\Attributes\Group('mod_photogallery')]
 #[\PHPUnit\Framework\Attributes\CoversClass(image_validator::class)]
