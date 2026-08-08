@@ -361,7 +361,8 @@ final class metadata_manager_test extends \advanced_testcase {
      */
     private function png(): string {
         return (string) base64_decode(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==',
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAACXBIWXMAAA7EAAAOxAGVKw4b'
+            . 'AAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==',
             true
         );
     }

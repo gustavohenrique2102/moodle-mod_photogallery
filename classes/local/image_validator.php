@@ -967,6 +967,7 @@ final class image_validator {
      * Throws the plugin's existing invalid-image exception.
      *
      * @param string $filename Filename shown to the user.
+     * @param bool $zipcontext Whether the call is made from ZIP validation.
      * @return never
      */
     private static function throw_invalid_image(

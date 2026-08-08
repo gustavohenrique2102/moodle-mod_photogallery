@@ -23,6 +23,21 @@ namespace mod_photogallery;
  * @category  test
  * @copyright 2026 Gustavo Soares
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers ::photogallery_add_instance
+ * @covers ::photogallery_update_instance
+ * @covers ::photogallery_delete_instance
+ * @covers ::photogallery_supports
+ * @covers ::photogallery_get_filemanager_options
+ * @covers ::photogallery_get_cover_filemanager_options
+ * @covers ::photogallery_get_zip_filepicker_options
+ * @covers ::photogallery_prepare_image_drafts
+ * @covers ::photogallery_get_file_areas
+ * @covers ::photogallery_get_file_info
+ * @covers ::photogallery_import_zip
+ * @covers ::photogallery_cleanup_image_metadata
+ * @covers ::photogallery_cm_info_view
+ * @covers ::photogallery_queue_missing_previews
+ * @covers ::photogallery_view
  */
 #[\PHPUnit\Framework\Attributes\Group('mod_photogallery')]
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_photogallery\task\generate_previews::class)]
@@ -47,15 +62,18 @@ namespace mod_photogallery;
 final class lib_test extends \advanced_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAACXBIWXMAAA7EAAAOxAGVKw4b'
+        . 'AAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
     /** A second valid 1x1 PNG image with different content. */
     private const PNG_TWO =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX///+nxBvIAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX///+nxBvIAAAACXBIWXMAAA7EAAAOxAGVKw4b'
+        . 'AAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
     /** A third valid 1x1 PNG image with different content. */
     private const PNG_THREE =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX/AAAZ4gk3AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX/AAAZ4gk3AAAACXBIWXMAAA7EAAAOxAGVKw4b'
+        . 'AAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
     /**
      * Loads the activity library once for the test case.
@@ -951,7 +969,7 @@ final class lib_test extends \advanced_testcase {
             'id',
             [
                 'photogalleryid' => $galleryid,
-                'pathnamehash' => $file->get_pathnamehash()
+                'pathnamehash' => $file->get_pathnamehash(),
             ]
         );
 

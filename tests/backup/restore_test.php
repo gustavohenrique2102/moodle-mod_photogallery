@@ -28,6 +28,10 @@ require_once($CFG->libdir . '/phpunit/classes/restore_date_testcase.php');
  * @category  test
  * @copyright 2026 Gustavo Soares
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \backup_photogallery_activity_task
+ * @covers \restore_photogallery_activity_task
+ * @covers \backup_photogallery_activity_structure_step
+ * @covers \restore_photogallery_activity_structure_step
  */
 #[\PHPUnit\Framework\Attributes\Group('mod_photogallery')]
 #[\PHPUnit\Framework\Attributes\Group('backup')]
@@ -315,7 +319,7 @@ final class restore_test extends \restore_date_testcase {
             'id',
             [
                 'photogalleryid' => $galleryid,
-                'pathnamehash' => $file->get_pathnamehash()
+                'pathnamehash' => $file->get_pathnamehash(),
             ]
         );
 
