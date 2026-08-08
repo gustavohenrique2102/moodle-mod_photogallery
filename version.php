@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'mod_photogallery';
-$plugin->version = 2026080700;
+$plugin->version = 2026080800;
 $plugin->requires = 2026042000;
-$plugin->maturity = MATURITY_ALPHA;
-$plugin->release = 'v0.3.1';
+$plugin->maturity = MATURITY_STABLE;
+$plugin->release = 'v1.0.0';

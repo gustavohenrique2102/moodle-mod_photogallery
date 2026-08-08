@@ -67,6 +67,25 @@ embedded camera and location metadata, but the visible photograph and its
 caption may still contain personal information. Site administrators must apply
 their institutional publication, consent, access, and retention policies.
 
+## Documentation
+
+Documentation, installation instructions, requirements, limits, and usage
+information are maintained in this repository.
+
+- Project repository: https://github.com/gustavohenrique2102/moodle-mod_photogallery
+- Moodle Plugin CI: https://github.com/gustavohenrique2102/moodle-mod_photogallery/actions
+
+## Support and bug reports
+
+Bug reports, feature requests, and technical questions can be submitted through
+the GitHub issue tracker:
+
+https://github.com/gustavohenrique2102/moodle-mod_photogallery/issues
+
+When reporting a problem, please include the Moodle version, PHP version,
+database type, steps to reproduce the issue, and any relevant error messages.
+
+
 ## License
 
 GNU GPL v3 or later.
