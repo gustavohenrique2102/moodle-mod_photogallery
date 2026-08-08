@@ -1,0 +1,5 @@
+filter:
+    notPaths:
+        - ci
+        - test.php
+        - test_gen.php
