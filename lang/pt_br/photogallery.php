@@ -83,6 +83,10 @@ $string['managephotosnotice'] =
     'As fotografias removidas deste gerenciador serão excluídas da galeria depois que você salvar as alterações.';
 $string['managephotostitle'] =
     'Gerenciar fotos: {$a}';
+$string['mediaconflict'] =
+    'A fotografia foi substituída enquanto estava sendo processada. Nenhuma alteração foi feita.';
+$string['medialockfailed'] =
+    'A galeria está sendo atualizada por outro processo. Aguarde e tente novamente.';
 $string['metadataconflict'] =
     'A galeria foi alterada enquanto esta página estava aberta. Suas alterações não foram salvas. Revise os valores atuais e tente novamente.';
 $string['metadataintro'] =

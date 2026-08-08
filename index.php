@@ -31,5 +31,5 @@ require_course_login($course);
 
 \core_courseformat\activityoverviewbase::redirect_to_overview_page(
     $courseid,
-    'resource'
+    'photogallery'
 );

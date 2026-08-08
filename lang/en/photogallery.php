@@ -84,6 +84,10 @@ $string['managephotosnotice'] =
     'Photographs removed from this file manager will be deleted from the gallery after you save the changes.';
 $string['managephotostitle'] =
     'Manage photos: {$a}';
+$string['mediaconflict'] =
+    'The photograph was replaced while it was being processed. No changes were made.';
+$string['medialockfailed'] =
+    'The gallery is being updated by another process. Please wait and try again.';
 $string['metadataconflict'] =
     'The gallery changed while this page was open. Your changes were not saved. Review the current values and try again.';
 $string['metadataintro'] =

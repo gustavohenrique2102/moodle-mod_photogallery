@@ -29,7 +29,7 @@ global $DB, $OUTPUT, $PAGE;
 
 $id = required_param('id', PARAM_INT);
 $cm = get_coursemodule_from_id('photogallery', $id, 0, false, MUST_EXIST);
-$course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+$course = get_course($cm->course);
 $photogallery = $DB->get_record('photogallery', ['id' => $cm->instance], '*', MUST_EXIST);
 
 require_course_login($course, true, $cm);

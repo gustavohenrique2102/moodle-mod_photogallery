@@ -57,13 +57,6 @@ $context = \core\context\module::instance(
     MUST_EXIST
 );
 
-// Ajuda o analisador estático a eliminar o retorno false.
-if ($context === false) {
-    throw new \core\exception\coding_exception(
-        'Não foi possível localizar o contexto da galeria de fotos.'
-    );
-}
-
 // Verifica a permissão de visualização.
 require_capability(
     'mod/photogallery:view',
@@ -104,7 +97,7 @@ $PAGE->set_heading(
     format_string(
         $course->fullname,
         true,
-        ['context' => context_course::instance($course->id)]
+        ['context' => \core\context\course::instance($course->id)]
     )
 );
 
@@ -116,10 +109,9 @@ $PAGE->requires->js_call_amd(
 echo $OUTPUT->header();
 
 echo $OUTPUT->heading(
-    format_string($photogallery->name)
+    format_string($photogallery->name, true, ['context' => $context])
 );
 
-/** @var \context $capabilitycontext */
 $capabilitycontext = $context;
 
 if (

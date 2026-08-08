@@ -161,10 +161,16 @@ class gallery implements renderable, templatable {
             $caption = trim(
                 (string) ($record->caption ?? '')
             );
+            if ($caption !== '') {
+                $caption = format_string($caption, true, ['context' => $this->context]);
+            }
 
             $alttext = trim(
                 (string) ($record->alttext ?? '')
             );
+            if ($alttext !== '') {
+                $alttext = format_string($alttext, true, ['context' => $this->context]);
+            }
 
             $fallbackalt = get_string(
                 'imagealt',

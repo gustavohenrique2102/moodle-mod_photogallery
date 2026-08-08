@@ -224,10 +224,16 @@ class preview implements renderable, templatable {
             $caption = trim(
                 (string) ($record->caption ?? '')
             );
+            if ($caption !== '') {
+                $caption = format_string($caption, true, ['context' => $this->context]);
+            }
 
             $alttext = trim(
                 (string) ($record->alttext ?? '')
             );
+            if ($alttext !== '') {
+                $alttext = format_string($alttext, true, ['context' => $this->context]);
+            }
 
             $fallbackalt = get_string(
                 'imagealt',
@@ -281,7 +287,13 @@ class preview implements renderable, templatable {
 
             $record = $this->metadata[$file->get_pathnamehash()] ?? null;
             $caption = trim((string) ($record->caption ?? ''));
+            if ($caption !== '') {
+                $caption = format_string($caption, true, ['context' => $this->context]);
+            }
             $alttext = trim((string) ($record->alttext ?? ''));
+            if ($alttext !== '') {
+                $alttext = format_string($alttext, true, ['context' => $this->context]);
+            }
             $fallbackalt = get_string(
                 'imagealt',
                 'mod_photogallery',
