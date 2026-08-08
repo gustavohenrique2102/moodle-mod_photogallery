@@ -1,0 +1,104 @@
+#!/usr/bin/env php
+<?php
+
+/*
+ * This file is part of the Moodle Plugin CI package.
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ *
+ * Copyright (c) 2018 Blackboard Inc. (http://www.blackboard.com)
+ * License http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+use MoodlePluginCI\Command\AddConfigCommand;
+use MoodlePluginCI\Command\AddPluginCommand;
+use MoodlePluginCI\Command\BehatCommand;
+use MoodlePluginCI\Command\CodeCheckerCommand;
+use MoodlePluginCI\Command\CodeFixerCommand;
+use MoodlePluginCI\Command\CopyPasteDetectorCommand;
+use MoodlePluginCI\Command\CoverallsUploadCommand;
+use MoodlePluginCI\Command\GruntCommand;
+use MoodlePluginCI\Command\InstallCommand;
+use MoodlePluginCI\Command\MessDetectorCommand;
+use MoodlePluginCI\Command\MustacheCommand;
+use MoodlePluginCI\Command\ParallelCommand;
+use MoodlePluginCI\Command\PHPDocCommand;
+use MoodlePluginCI\Command\PHPLintCommand;
+use MoodlePluginCI\Command\PHPUnitCommand;
+use MoodlePluginCI\Command\SavePointsCommand;
+use MoodlePluginCI\Command\SelfUpdateCommand;
+use MoodlePluginCI\Command\ValidateCommand;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Dotenv\Dotenv;
+
+if (file_exists(__DIR__ . '/../../../autoload.php')) {
+    // Global install.
+    /** @noinspection PhpIncludeInspection */
+    require_once __DIR__ . '/../../../autoload.php';
+} elseif (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    // Project install.
+    require_once __DIR__ . '/../vendor/autoload.php';
+} else {
+    fwrite(STDERR, 'Failed to find Composer\'s autoload file. You might need to run Composer\'s install on this project' . PHP_EOL);
+    exit(1);
+}
+
+// Current version. Keep it updated on releases.
+define('MOODLE_PLUGIN_CI_VERSION', '4.5.11');
+
+define('MOODLE_PLUGIN_CI_BOXED', '@is_boxed@');
+
+// If we are running moodle-plugin-ci within a PHAR, we need to set the
+// path to the dotenv file differently.
+if (Phar::running() !== '') {
+    // The .env file is in the same directory than the phar.
+    define('ENV_FILE', dirname(Phar::running(false)) . '/.env');
+} else {
+    // The .env file is in the root directory of the moodle-plugin-ci project.
+    define('ENV_FILE', dirname(__DIR__) . '/.env');
+}
+
+if (file_exists(ENV_FILE)) {
+    // Use this file because PHP cannot write to the environment.
+    // These are used to allow the installation command to relay important
+    // information to the other commands, so they can run with no args.
+
+    // While putenv()/getenv() are not thread safe, this is only used in the CLI,
+    // so it is not a problem. In the future we may want to stop using those functions
+    // everywhere and use $_ENV or $_SERVER instead. Of course getting rid of the .env
+    // file would be even better.
+    $env = (new Dotenv())->usePutenv(true);
+    $env->load(ENV_FILE);
+}
+
+$version = (new SebastianBergmann\Version(MOODLE_PLUGIN_CI_VERSION, dirname(__DIR__)))->getVersion();
+// Let's make Box to find the better version for the phar from git.
+if (MOODLE_PLUGIN_CI_BOXED === 'BOXED') {
+    $version = '@package_version@';
+}
+
+$application = new Application('Moodle Plugin CI', $version);
+$application->add(new AddConfigCommand());
+$application->add(new AddPluginCommand(ENV_FILE));
+$application->add(new BehatCommand());
+$application->add(new CodeCheckerCommand());
+$application->add(new CodeFixerCommand());
+$application->add(new CopyPasteDetectorCommand());
+$application->add(new CoverallsUploadCommand());
+$application->add(new GruntCommand());
+$application->add(new InstallCommand(ENV_FILE));
+$application->add(new MessDetectorCommand());
+$application->add(new MustacheCommand());
+$application->add(new ParallelCommand());
+$application->add(new PHPDocCommand());
+$application->add(new PHPLintCommand());
+$application->add(new PHPUnitCommand());
+$application->add(new SavePointsCommand());
+$application->add(new ValidateCommand());
+
+// Only add the self update command if we are boxed as a phar.
+if (MOODLE_PLUGIN_CI_BOXED === 'BOXED') {
+    $application->add(new SelfUpdateCommand());
+}
+$application->run();

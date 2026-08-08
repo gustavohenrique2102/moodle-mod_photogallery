@@ -887,7 +887,7 @@ function photogallery_get_file_info(
         $CFG->wwwroot . '/pluginfile.php',
         $areas[$filearea],
         true,
-        false,
+        true,
         false,
         false
     );

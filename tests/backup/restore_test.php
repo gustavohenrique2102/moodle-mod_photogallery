@@ -192,6 +192,9 @@ final class restore_test extends \restore_date_testcase {
             $CFG->dirroot . '/backup/util/includes/restore_includes.php'
         );
         require_once(
+            $CFG->dirroot . '/backup/util/includes/backup_includes.php'
+        );
+        require_once(
             $CFG->dirroot .
             '/mod/photogallery/backup/moodle2/' .
             'backup_photogallery_activity_task.class.php'
@@ -287,19 +290,31 @@ final class restore_test extends \restore_date_testcase {
         global $DB;
 
         $now = time();
-        $DB->insert_record(
-            'photogallery_image',
-            (object) [
+        $record = (object) [
             'photogalleryid' => $galleryid,
             'pathnamehash' => $file->get_pathnamehash(),
             'contenthash' => $file->get_contenthash(),
             'caption' => $caption,
-                'alttext' => $alttext,
-                'sortorder' => $sortorder,
-                'timecreated' => $now,
-                'timemodified' => $now,
+            'alttext' => $alttext,
+            'sortorder' => $sortorder,
+            'timecreated' => $now,
+            'timemodified' => $now,
+        ];
+
+        $record->id = $DB->get_field(
+            'photogallery_image',
+            'id',
+            [
+                'photogalleryid' => $galleryid,
+                'pathnamehash' => $file->get_pathnamehash()
             ]
         );
+
+        if ($record->id) {
+            $DB->update_record('photogallery_image', $record);
+        } else {
+            $DB->insert_record('photogallery_image', $record);
+        }
     }
 
     /**

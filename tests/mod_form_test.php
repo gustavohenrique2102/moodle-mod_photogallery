@@ -133,6 +133,11 @@ final class mod_form_test extends \advanced_testcase {
             'importzip' => 0,
             'completion' => COMPLETION_TRACKING_NONE,
             'completionview' => 0,
+            'instance' => 1,
+            'modulename' => 'photogallery',
+            'coursemodule' => 1,
+            'cmidnumber' => '',
+            'availabilityconditionsjson' => '{"op":"&","c":[],"showc":[]}',
         ];
     }
 

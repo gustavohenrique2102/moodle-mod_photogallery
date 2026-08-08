@@ -44,15 +44,15 @@ namespace mod_photogallery;
 final class lib_test extends \advanced_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNgYGAAAAAEAAGjChXjAAAAAElFTkSuQmCC';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
     /** A second valid 1x1 PNG image with different content. */
     private const PNG_TWO =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNg+M8AAAICAQAuFKzOAAAAAElFTkSuQmCC';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX///+nxBvIAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
     /** A third valid 1x1 PNG image with different content. */
     private const PNG_THREE =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWP4z8AAAAMBAQCc479ZAAAAAElFTkSuQmCC';
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX/AAAZ4gk3AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
     public static function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
@@ -626,9 +626,10 @@ final class lib_test extends \advanced_testcase {
         $tasks = \core\task\manager::get_adhoc_tasks(
             \mod_photogallery\task\generate_previews::class
         );
-        $this->assertCount(1, $tasks);
+        $this->assertCount(2, $tasks);
 
         $tasks[0]->execute();
+        $tasks[1]->execute();
 
         $thumbs = get_file_storage()->get_area_files(
             $context->id,
@@ -939,7 +940,20 @@ final class lib_test extends \advanced_testcase {
             'timemodified' => $now,
         ];
 
-        $record->id = $DB->insert_record('photogallery_image', $record);
+        $record->id = $DB->get_field(
+            'photogallery_image',
+            'id',
+            [
+                'photogalleryid' => $galleryid,
+                'pathnamehash' => $file->get_pathnamehash()
+            ]
+        );
+
+        if ($record->id) {
+            $DB->update_record('photogallery_image', $record);
+        } else {
+            $record->id = $DB->insert_record('photogallery_image', $record);
+        }
 
         return $record;
     }
