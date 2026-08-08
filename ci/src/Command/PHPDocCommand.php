@@ -62,12 +62,19 @@ class PHPDocCommand extends AbstractMoodleCommand
             return $this->outputSkip($output);
         }
 
+        $pluginPath = $this->getPluginPathRelativeToMoodleRoot();
+        $excludePaths = $this->getPluginExcludePaths($pluginPath);
+
         $cmd = [
             'php',
             'local/moodlecheck/cli/moodlecheck.php',
-            '-p=' . implode(',', $files),
+            '-p=' . $pluginPath,
             '-f=text',
         ];
+
+        if (!empty($excludePaths)) {
+            $cmd[] = '-e=' . implode(',', $excludePaths);
+        }
 
         $process = $this->execute->passThroughProcess(new Process($cmd, $this->moodle->getPublicDirectory(), null, null, null));
 
@@ -91,5 +98,40 @@ class PHPDocCommand extends AbstractMoodleCommand
 
         // With errors or warnings over the max-warnings threshold, fail the command.
         return ($totalErrors > 0 || ($totalWarnings > $input->getOption('max-warnings'))) ? 1 : 0;
+    }
+
+    private function getPluginPathRelativeToMoodleRoot(): string
+    {
+        $publicDirectory = $this->moodle->getPublicDirectory();
+        $pluginPath = $this->plugin->directory;
+
+        $normalizedPublic = str_replace('\\', '/', $publicDirectory);
+        $normalizedPlugin = str_replace('\\', '/', $pluginPath);
+
+        if (str_starts_with($normalizedPlugin, $normalizedPublic . '/')) {
+            $relative = substr($normalizedPlugin, strlen($normalizedPublic) + 1);
+        } else {
+            $relative = $normalizedPlugin;
+        }
+
+        return ltrim($relative, '/');
+    }
+
+    private function getPluginExcludePaths(string $pluginPath): array
+    {
+        $excludePaths = [];
+
+        foreach ($this->plugin->getThirdPartyLibraryPaths() as $thirdPartyPath) {
+            $excludePaths[] = $pluginPath . '/' . str_replace('\\', '/', $thirdPartyPath);
+        }
+
+        $ignores = $this->plugin->getIgnores();
+        if (!empty($ignores['notPaths'])) {
+            foreach ($ignores['notPaths'] as $notPath) {
+                $excludePaths[] = $pluginPath . '/' . str_replace('\\', '/', $notPath);
+            }
+        }
+
+        return array_values(array_unique($excludePaths));
     }
 }

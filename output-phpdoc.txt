@@ -1,0 +1,2 @@
+﻿ RUN  Moodle PHPDoc Checker on mod_photogallery
+!!! Erro de codifica├º├úo detectado e deve ser corrigido por um programador: Invalid component specified in renderer request !!!
