@@ -17,6 +17,9 @@ clover.xml
 photogallery-phpcs*.txt
 phpcs*.txt
 phpunit*.txt
+job_log.txt
+jobs.json
+runs.json
 *.log
 
 # Pacotes e backups locais.
@@ -34,3 +37,6 @@ desktop.ini
 *.tmp
 *.temp
 *~
+test.php
+test.png
+test_gen.php
