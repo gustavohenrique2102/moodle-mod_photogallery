@@ -33,12 +33,18 @@ use mod_photogallery\local\zip_importer;
 #[\PHPUnit\Framework\Attributes\CoversClass(image_validator::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(zip_importer::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(thumbnail_manager::class)]
+/**
+ * Covers the media sanitisation and background preview pipeline.
+ */
 final class media_pipeline_test extends \advanced_testcase {
     /** Valid, GD-decodable 1x1 red PNG. */
     private const PNG_RED =
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4b'
         . 'AAAADElEQVQImWP4z8AAAAMBAQCc479ZAAAAAElFTkSuQmCC';
 
+    /**
+     * Loads the activity library once for the test case.
+     */
     public static function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
 
@@ -46,6 +52,9 @@ final class media_pipeline_test extends \advanced_testcase {
         require_once($CFG->dirroot . '/mod/photogallery/lib.php');
     }
 
+    /**
+     * Resets Moodle state and elevates permissions before each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();

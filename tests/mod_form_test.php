@@ -111,6 +111,7 @@ final class mod_form_test extends \advanced_testcase {
         ]);
         $cm = get_coursemodule_from_instance('photogallery', $gallery->id, $course->id, false, MUST_EXIST);
         $current = $DB->get_record('photogallery', ['id' => $gallery->id], '*', MUST_EXIST);
+        $current->instance = $gallery->id;
         $current->availabilityconditionsjson = null;
 
         $PAGE->set_course($course);

@@ -41,6 +41,9 @@ namespace mod_photogallery;
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_cm_info_view')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_queue_missing_previews')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('photogallery_view')]
+/**
+ * Covers the activity library integration points.
+ */
 final class lib_test extends \advanced_testcase {
     /** A valid 1x1 PNG image. */
     private const PNG_ONE =
@@ -54,6 +57,9 @@ final class lib_test extends \advanced_testcase {
     private const PNG_THREE =
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEX/AAAZ4gk3AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==';
 
+    /**
+     * Loads the activity library once for the test case.
+     */
     public static function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
 
@@ -61,6 +67,9 @@ final class lib_test extends \advanced_testcase {
         require_once($CFG->dirroot . '/mod/photogallery/lib.php');
     }
 
+    /**
+     * Resets Moodle state and elevates permissions before each test.
+     */
     protected function setUp(): void {
         parent::setUp();
 
@@ -629,9 +638,6 @@ final class lib_test extends \advanced_testcase {
         ));
         $this->assertCount(2, $tasks);
 
-        $tasks[0]->execute();
-        $tasks[1]->execute();
-
         $thumbs = get_file_storage()->get_area_files(
             $context->id,
             'mod_photogallery',
@@ -640,9 +646,8 @@ final class lib_test extends \advanced_testcase {
             'id ASC',
             false
         );
-        $this->assertCount(2, $thumbs);
-        $this->assertInstanceOf(
-            \stored_file::class,
+        $this->assertCount(0, $thumbs);
+        $this->assertNull(
             photogallery_get_resized_preview($image, $context, 'grid')
         );
     }

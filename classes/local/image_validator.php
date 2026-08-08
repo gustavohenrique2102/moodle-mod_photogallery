@@ -578,18 +578,15 @@ final class image_validator {
         $source = $file->get_source();
         $expectedmarker = self::get_sanitised_marker($file);
 
-        if (
-            $file->get_component() !== 'user'
-            || $file->get_filearea() !== 'draft'
-        ) {
-            return is_string($source)
-                && hash_equals($expectedmarker, $source);
+        if (!is_string($source)) {
+            return false;
         }
 
-        if (
-            !is_string($source)
-            || !str_starts_with($source, 'O:8:"stdClass":')
-        ) {
+        if (hash_equals($expectedmarker, $source)) {
+            return true;
+        }
+
+        if (!str_starts_with($source, 'O:8:"stdClass":')) {
             return false;
         }
 

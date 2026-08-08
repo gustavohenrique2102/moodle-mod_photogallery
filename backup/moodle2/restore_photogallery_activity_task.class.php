@@ -134,7 +134,7 @@ class restore_photogallery_activity_task extends restore_activity_task {
                 'photogallery',
                 'view all',
                 'index.php?id={course}',
-                null
+                ''
             ),
         ];
     }
