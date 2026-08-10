@@ -447,6 +447,11 @@ final class metadata_manager {
                 }
                 $processedpaths[$path] = true;
 
+                // Propagate the sanitised marker from the draft area to the
+                // permanent file so that thumbnail generation can use the
+                // faster resize_image() path instead of re-sanitising.
+                image_validator::mark_sanitised($file);
+
                 // New files have no metadata to preserve.
                 if (!$record) {
                     continue;
